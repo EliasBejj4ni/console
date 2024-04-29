@@ -1,0 +1,54 @@
+<script lang="ts">
+	import * as Card from '$lib/components/ui/card';
+	import { signIn } from '@auth/sveltekit/client';
+	import { page } from '$app/stores';
+	import Landing from '$lib/images/console_landing.jpg';
+	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+
+	console.log($page.data);
+
+	onMount(() => {
+		if ($page.data.session && $page.data.session.user) {
+			goto('/home');
+		}
+	});
+
+	async function handleSignIn() {
+		const result = await signIn('keycloak');
+		if (result) {
+			goto('/home');
+		} else {
+			console.error('Sign in failed');
+		}
+	}
+</script>
+
+<div class="hero min-h-screen" style="background-image: url({Landing})">
+	<div class="p-24">
+        <Card.Root class="mx-auto max-w-sm overflow-hidden rounded-lg shadow-lg">
+            <Card.Header>
+                <Card.Title class="text-xl font-bold text-center text-gray-900">Sign In</Card.Title>
+                <Card.Description class="text-center text-gray-600">Please enter your credentials</Card.Description>
+            </Card.Header>
+            <Card.Content>
+                <form class="mb-4 bg-white rounded px-8 pt-6 pb-8">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="login-email">
+                            Email:
+                        </label>
+                        <input id="login-email" type="email" name="email"
+                               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                               placeholder="Type email" required />
+                    </div>
+                    <button onclick={handleSignIn}
+                            class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                            type="button">Sign in with Keycloak</button>
+                </form>
+            </Card.Content>
+            <Card.Footer>
+            </Card.Footer>
+        </Card.Root>
+    </div>
+    
+</div>
