@@ -9,12 +9,14 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
       clientId: env.AUTH_KEYCLOAK_ID,
       clientSecret: env.AUTH_KEYCLOAK_SECRET,
       issuer: env.AUTH_KEYCLOAK_ISSUER,
-    })
+      authorization: { params: { scope: 'openid profile offline_access email' } },
+    }),
   ],
   callbacks:{
     async jwt({token, account}){
         if(account){
             token.accessToken = account.access_token
+            token.refreshToken = account.refresh_token;
             // @ts-ignore
             const decodedToken = jwtDecode(account.access_token);
             // @ts-ignore
@@ -26,6 +28,8 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
       if (token) {
         // @ts-ignore
         session.access_token = token.accessToken;
+        // @ts-ignore
+        session.refreshToken = token.refreshToken;
         // @ts-ignore
         session.roles = token.roles; 
       }
