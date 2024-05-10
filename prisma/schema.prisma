@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model environment {
+  id                      Int                       @id @default(autoincrement())
+  environment_name        String                    @db.VarChar(255)
+  environment_information environment_information[]
+}
+
+model environment_information {
+  id                          Int         @id @default(autoincrement())
+  environment_id              Int
+  general_name                String?     @db.VarChar(255)
+  general_context             String?
+  general_common_client_url   String?     @db.VarChar(255)
+  general_block_installations Boolean?
+  general_cause               Boolean?
+  general_encryption_type     String?     @db.VarChar(100)
+  general_communication_type  String?     @db.VarChar(100)
+  environment                 environment @relation(fields: [environment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}

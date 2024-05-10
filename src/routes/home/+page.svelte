@@ -29,43 +29,11 @@
 		window.location.reload();
 	}
 
-	async function handleSignOut() {
-		try {
-			console.log('Signing out...');
-
-			const params = new URLSearchParams({
-				client_id: 'console',
-				client_secret: 'c1uiu7kHmzKwunMpSKF598Ls2uo0EDKL',
-				refresh_token: refreshToken
-			});
-			
-			const response = await fetch(
-				`http://localhost:8081/realms/console/protocol/openid-connect/logout`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded'
-					},
-					body: params.toString()
-				}
-			);
-            await signOut();
-			if (!response.ok) {
-				throw new Error(`HTTP error during logout! Status: ${response.status}`);
-			}
-
-			console.log('Logged out successfully.');
-			goto('/');
-		} catch (error) {
-			console.error('Error signing out:', error);
-		}
-	}
-
 	async function refreshTokenFunction() {
 		const params = new URLSearchParams({
 			grant_type: 'refresh_token',
 			client_id: 'console',
-			client_secret: 'c1uiu7kHmzKwunMpSKF598Ls2uo0EDKL',
+			client_secret: 'aFA7LFGwKa7J1WTa00xvJ99VUrsohVQ8',
 			refresh_token: refreshToken
 		});
 
@@ -80,7 +48,7 @@
 					body: params.toString()
 				}
 			);
-            
+
             reloadPage();
 			if (!response.ok) {
 				throw new Error(`HTTP error! Status: ${response.status}`);
@@ -100,6 +68,26 @@
 			return null;
 		}
 	}
+
+	async function handleSignOut() {
+
+    const response = await fetch('/auth/logout', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refreshToken: refreshToken })
+    });
+
+	await signOut();
+    if (response.ok) {
+        console.log('Logged out successfully, redirecting...');
+        goto('/');
+    } else {
+        const { error } = await response.json();
+        console.error('Error signing out:', error);
+    }
+}
 
 </script>
 

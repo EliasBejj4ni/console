@@ -1,55 +1,34 @@
 <script lang="ts">
 	import { signOut } from '@auth/sveltekit/client';
 	import { page } from '$app/stores';
-	import { jwtDecode } from 'jwt-decode';
 	import Landing from '$lib/images/console_landing.jpg';
 	import { goto } from '$app/navigation';
+
 	console.log($page.data.session);
     let sessionData = $page.data.session;
-	let roles: string[] = [];
+
 	// @ts-ignore
 	let refreshToken = sessionData?.refreshToken ?? '';
-	// @ts-ignore
-	$: if ($page.data.session && $page.data.session.access_token) {
-		// @ts-ignore
-		const decoded: any = jwtDecode($page.data.session.access_token);
-		if (decoded && decoded.realm_access && Array.isArray(decoded.realm_access.roles)) {
-			roles = decoded.realm_access.roles;
-		}
-		console.log('User Roles:', roles);
-	}
 
 	async function handleSignOut() {
-		try {
-			console.log('Signing out...');
 
-			const params = new URLSearchParams({
-				client_id: 'console',
-				client_secret: 'c1uiu7kHmzKwunMpSKF598Ls2uo0EDKL',
-				refresh_token: refreshToken
-			});
-			await signOut();
-			const response = await fetch(
-				`http://localhost:8081/realms/console/protocol/openid-connect/logout`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded'
-					},
-					body: params.toString()
-				}
-			);
-
-			if (!response.ok) {
-				throw new Error(`HTTP error during logout! Status: ${response.status}`);
-			}
-
-			console.log('Logged out successfully.');
-			goto('/');
-		} catch (error) {
-			console.error('Error signing out:', error);
-		}
-	}
+    const response = await fetch('/auth/logout', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ refreshToken: refreshToken })
+    });
+	
+    if (response.ok) {
+		await signOut();
+        console.log('Logged out successfully, redirecting...');
+        goto('/');
+    } else {
+        const { error } = await response.json();
+        console.error('Error signing out:', error);
+    }
+}
 </script>
 
 <div class="hero min-h-screen bg-cover bg-center" style="background-image: url({Landing})">
