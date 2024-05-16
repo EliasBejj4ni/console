@@ -1,10 +1,8 @@
 <script>
-  import Etoile from '$lib/images/etoile_sab.png';
 </script>
 <div class="bg-white border-2 border-gray-300 p-0 ml-0 flex-grow">
 <aside class="bg-white shadow">
   <div class="flex items-center bg-gray-500 p-1">
-    <img src={Etoile} alt="Etoile" class="h-4 mr-2">
     <h2 class="text-white text-sm font-bold">Page Navigator</h2>
   </div> 
   <ul class="list-none p-4 text-xs"> <!-- Applied text-xs to all list items -->

@@ -82,7 +82,7 @@
 	await signOut();
     if (response.ok) {
         console.log('Logged out successfully, redirecting...');
-        goto('/');
+        goto('/login');
     } else {
         const { error } = await response.json();
         console.error('Error signing out:', error);

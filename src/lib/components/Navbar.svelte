@@ -16,12 +16,12 @@
 <!-- {#if sessionData} -->
     <div class="hidden lg:flex navbar bg-base-100 w-full">
       <div class="navbar-start flex-1 px-4">
-        <a class="btn btn-ghost normal-case text-xl" href="/home">Console</a>
+        <a class="btn btn-ghost normal-case text-xl" href="/auth/home">Console</a>
       </div>
       <div class="navbar-center flex-auto text-center">
         <ul class="menu menu-horizontal p-0 inline-flex justify-center flex-grow">
           <li class="mx-2">
-            <a href="/home" class="hover:text-blue-500 transition-colors">Home</a>
+            <a href="/auth/home" class="hover:text-blue-500 transition-colors">Home</a>
           </li>
           <li class="mx-2">
             <a href="/about" class="hover:text-blue-500 transition-colors">About</a>

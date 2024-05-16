@@ -1,3 +1,4 @@
+
 export async function POST(request) {
     const { refreshToken } = await request.request.json(); 
 
@@ -23,8 +24,7 @@ export async function POST(request) {
         return new Response(null, {
             status: 303,
             headers: {
-                'Set-Cookie': 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly',
-                'Location': '/'
+                'Location': '/login'
             }
         });
     } catch (error) {

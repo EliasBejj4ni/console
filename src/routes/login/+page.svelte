@@ -15,14 +15,14 @@
 
 	onMount(() => {
 		if ($page.data.session && $page.data.session.user) {
-			goto('/home');
+			goto('/auth/home');
 		}
 	});
 
 	async function handleSignIn() {
 		const result = await signIn('keycloak');
 		if (result) {
-			goto('/home');
+			goto('/auth/home');
 		} else {
 			console.error('Sign in failed');
 		}

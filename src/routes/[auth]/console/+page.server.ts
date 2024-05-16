@@ -1,14 +1,28 @@
 import type { Actions, PageServerLoad } from "./$types";
 import { prisma } from "$lib/server/prisma";
 import { fail } from "@sveltejs/kit";
+import { json, redirect } from "@sveltejs/kit"
 
-export const load: PageServerLoad = async () => {
-    const environments = await prisma.environment.findMany();
-    console.log(environments, "Loaded environments from DB");
+// export const load: PageServerLoad = async () => {
+//     const environments = await prisma.environment.findMany();
+//     console.log(environments, "Loaded environments from DB");
+//     return {
+//         props: { environments },
+//     };
+// }
+
+export const load: PageServerLoad = async (event) => {
+    const session = await event.locals.auth()
+   
+    if (!session?.user) {
+      throw redirect(302, '/login?message=Please+sign+in+first');
+    }
+   
     return {
-        props: { environments },
-    };
-}
+      session,
+    }
+  };
+  
 
 export const actions: Actions = {
     createEnvironment: async ({ request }) => {
@@ -34,7 +48,7 @@ export const actions: Actions = {
         return {
             status: 303,
             headers: {
-                location: '/'
+                location: '/auth/home'
             }
         };
     },
@@ -52,7 +66,7 @@ export const actions: Actions = {
                     id: Number(id),
                 },
             });
-            return { status: 303, headers: { Location: '/' } }; // Redirect after successful deletion
+            return { status: 303, headers: { Location: '/auth/home' } }; // Redirect after successful deletion
         } catch (err) {
             console.error(err);
             return fail(500, { message: "Could not delete the environment." });

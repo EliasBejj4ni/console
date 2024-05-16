@@ -1,31 +1,22 @@
-<script>
-  import SabLogo from '$lib/images/sab-logo2.png';
+<script lang="ts">
+  import { NavbarMenu, HoveredLink, MenuItem, ProductItem } from '$lib/components/ui/NavbarMenu';
+  let active: string | null = null;
 </script>
 
-<header>
-  <div class="bg-white text-gray-800 py-2 px-4 flex justify-between items-center">
-    <div class="flex items-center space-x-4">
-      <img src={SabLogo} alt="SAB Logo" class="h-16"> 
-    </div>
-    <div class="text-right">
-      <div class="text-lg font-semibold mb-1">sabuser</div>
-      <div class="flex items-center">
-        <button class="text-sm mr-2 hover:underline">My account</button>
-        <span class="text-sm text-gray-600">|</span>
-        <button class="text-sm ml-2 hover:underline">Log out</button>
-      </div>
-    </div>
-  </div>
-  <!-- Green Line -->
-  <div style="height: 4px; background-color: #047600;"></div> 
 
-<!-- Navigation Bar -->
-<nav style="background-color: #97c00e; color: white;" class="py-1">
-  <ul class="flex pl-4">
-    <li><a href="" class="hover:underline">JetSab</a></li>
-    <li class="ml-4"><a href="" class="hover:underline">Administration</a></li>
-    <li class="ml-4"><a href="" class="hover:underline">Environment Management</a></li>
-    <li class="ml-4"><a href="" class="hover:underline">Environment Display</a></li>
-  </ul>
-</nav>
+<header class="relative">
+  <div class={'fixed inset-x-0 top-0 z-50 mx-auto max-w'}>
+    <NavbarMenu  > 
+      <a href="/auth/home" class="text-black transition-colors duration-300 dark:text-white">Home</a>
+
+      <div class="flex items-center"> 
+        <MenuItem {active} item="Administration ▼" >
+          <div class="flex flex-col space-y-4 text-sm">
+            <HoveredLink href="/auth/console">Environment Management</HoveredLink>
+          </div>
+        </MenuItem>
+      </div>
+    </NavbarMenu>
+    
+  </div>
 </header>
