@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { signOut } from '@auth/sveltekit/client';
 	import { page } from '$app/stores';
 	import Landing from '$lib/images/console_landing.jpg';
 	import { goto } from '$app/navigation';
+	import { SignOut } from '@auth/sveltekit/components';
 
 	console.log($page.data.access_token);
 
@@ -33,7 +33,7 @@
 		const params = new URLSearchParams({
 			grant_type: 'refresh_token',
 			client_id: 'console',
-			client_secret: 'aFA7LFGwKa7J1WTa00xvJ99VUrsohVQ8',
+			client_secret: 'pu65BsPrjVgOD16WE98VlQOlbTNTLlKq',
 			refresh_token: refreshToken
 		});
 
@@ -79,7 +79,6 @@
         body: JSON.stringify({ refreshToken: refreshToken })
     });
 
-	await signOut();
     if (response.ok) {
         console.log('Logged out successfully, redirecting...');
         goto('/login');
@@ -92,29 +91,30 @@
 </script>
 
 <div class="min-h-screen bg-cover bg-center" style="background-image: url({Landing})">
-	<div class="p-10 text-center text-white">
-		<h1 class="mb-4 text-5xl font-bold">Home Page</h1>
+    <div class="p-10 text-center text-white">
+        <h1 class="mb-4 text-5xl font-bold">Home Page</h1>
 
-		<div class="mx-auto max-w-2xl">
-			<h2 class="mb-2 text-3xl font-semibold">You are logged in as {userName}</h2>
-			<p class="mb-4 text-xl">Roles: {roles.join(', ')}</p>
-			<button
-				on:click={() => {
-					console.log('Button clicked');
-					handleSignOut();
-				}}
-				class="rounded bg-blue-600 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:bg-blue-700"
-			>
-				Sign out
-			</button>
-			<button
-				on:click={() => {
-					refreshTokenFunction();
-				}}
-				class="rounded bg-blue-600 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:bg-blue-700"
-			>
-				Get Refresh Token
-			</button>
-		</div>
-	</div>
+        <div class="mx-auto max-w-2xl">
+            <h2 class="mb-2 text-3xl font-semibold">You are logged in as {userName}</h2>
+            <p class="mb-4 text-xl">Roles: {roles.join(', ')}</p>
+			<SignOut>
+				<div
+					slot="submitButton"
+					class="rounded bg-blue-600 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:bg-blue-700"
+					on:click={handleSignOut}
+				>
+					Sign out
+				</div>
+			</SignOut>
+            <button
+                on:click={() => {
+                    refreshTokenFunction();
+                }}
+                class="rounded bg-blue-600 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:bg-blue-700"
+            >
+                Get Refresh Token
+            </button>
+        </div>
+    </div>
 </div>
+

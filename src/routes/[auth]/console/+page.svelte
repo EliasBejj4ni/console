@@ -74,20 +74,20 @@
         }
     });
     
-    onMount(async () => {
-        try {
-            const { data } = await client.query({
-                query: GET_ENVIRONMENTS_INFO
-            });
-            console.log("Fetched environments info:", data.environments_info);
-            hasuraEnvironments.set(data.environments_info.map((item: any) => ({
-                id: item.environment.id,
-                environment_name: item.environment.environment_name
-            })));
-        } catch (error) {
-            console.error("Error fetching environments info:", error);
-        }
-    });
+    // onMount(async () => {
+    //     try {
+    //         const { data } = await client.query({
+    //             query: GET_ENVIRONMENTS_INFO
+    //         });
+    //         console.log("Fetched environments info:", data.environments_info);
+    //         hasuraEnvironments.set(data.environments_info.map((item: any) => ({
+    //             id: item.environment.id,
+    //             environment_name: item.environment.environment_name
+    //         })));
+    //     } catch (error) {
+    //         console.error("Error fetching environments info:", error);
+    //     }
+    // });
 
     $: if ($selectedEnvironmentId) {
     console.log("Selected Environment ID changed:", $selectedEnvironmentId);
@@ -495,7 +495,7 @@ $: if (hasuraEnvironments) {
                       </div>
                       <div class="flex items-center justify-start">
                         <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
-                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly>
                       </div>
                       <div class="flex items-center justify-start">
                         <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
@@ -540,6 +540,155 @@ $: if (hasuraEnvironments) {
                       </div>
                     </div>
                   </div>
+                  <div class="bg-white dark:bg-gray-800 p-4 mt-4">
+                    <div class="flex flex-col">
+                      <h1 class="text-xl font-bold text-[#FFAA33]">Sab BPM</h1>
+                      <p class="font-bold mt-2">These settings are only useful if SAB BPM is version 7.5.10 or higher.</p>
+                      <div class="space-y-1 py-1">
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Login :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Language :</label>
+                          <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled>
+                            <option></option>
+                          </select>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Password :</label>
+                          <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-white dark:bg-gray-800 p-4 mt-4">
+                    <div class="flex flex-col">
+                      <div class="flex items-center gap-3 mb-2">
+                        <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">Test</button>
+                        <h1 class="text-xl font-bold text-[#FFAA33]">Host Database</h1>
+                      </div>
+                      <div class="space-y-1 py-0">
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Type:</label>
+                          <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled>
+                            <option></option>
+                          </select>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Schema:</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Is secured:</label>
+                          <Checkbox class="align-middle transform scale-125" disabled />
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Server name:</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
+                          <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-white dark:bg-gray-800 p-4 mt-4">
+                    <div class="flex flex-col">
+                      <div class="flex items-center gap-3 mb-2">
+                        <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">Test</button>
+                        <h1 class="text-xl font-bold text-[#FFAA33]">Telemaintenance Database</h1>
+                      </div>
+                      <div class="space-y-1 py-0">
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Type :</label>
+                          <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled>
+                            <option></option>
+                          </select>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Login :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Schema :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Environment :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Is secured :</label>
+                          <Checkbox class="align-middle transform scale-125" disabled />
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Server name :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Password :</label>
+                          <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-white dark:bg-gray-800 p-4 mt-4">
+                    <div class="flex flex-col">
+                      <div class="flex items-center gap-3 mb-2">
+                        <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">Test</button>
+                        <h1 class="text-xl font-bold text-[#FFAA33]">X3S Database</h1>
+                      </div>
+                      <div class="space-y-1 py-0">
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Type :</label>
+                          <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled>
+                            <option></option>
+                          </select>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Login :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Schema :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Is secured :</label>
+                          <Checkbox class="align-middle transform scale-125" disabled />
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Server name :</label>
+                          <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                        <div class="flex items-center justify-start">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Password :</label>
+                          <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" readonly disabled>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="bg-white dark:bg-gray-800 p-4 mt-4">
+                    <div class="flex justify-start items-center space-x-4">
+                      <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">
+                        Test all
+                      </button>
+                      <button class="bg-white dark:bg-gray-800 text-black dark:text-white px-4 px-2 py-0 border border-gray-300 dark:border-gray-700 rounded focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
+                        Hide Referencing
+                      </button>
+                    </div>
+                  </div>                  
+                
                 </div>
               </Tabs.Content>
               
@@ -568,7 +717,7 @@ $: if (hasuraEnvironments) {
                 </div>
               </Tabs.Content>
               
-            <Tabs.Content value="edit">
+              <Tabs.Content value="edit">
                 <div class="bg-white dark:bg-gray-800 p-4">
                   <div class="flex items-center border-b border-gray-200 dark:border-gray-700 pb-4">
                     <div class="flex items-center space-x-2 flex-grow">
@@ -582,7 +731,7 @@ $: if (hasuraEnvironments) {
                     </div>
                   </div>
                 </div>
-                <div class="bg-white dark:bg-gray-800 p-4 shadow-md mt-4">
+                <div class="bg-white dark:bg-gray-800 p-4 shadow-md mt-0">
                   <div class="text-gray-700 dark:text-gray-300 text-sm py-2">
                     Last change the date time by user
                     <br>
@@ -600,7 +749,7 @@ $: if (hasuraEnvironments) {
                     </div>
                     <div class="flex items-center">
                       <label for="block-installations" class="text-gray-700 dark:text-gray-300 w-1/4">Block installations:</label>
-                      <Checkbox id="block-installations" class="align-middle transform scale-100" disabled={false} bind:checked={$selectedInfo.blockInstallations} />
+                      <Checkbox id="block-installations" class="align-middle transform scale-100" bind:checked={$selectedInfo.blockInstallations} />
                     </div>
                   </div>
                   <div class="bg-white dark:bg-gray-800 p-0 mt-4">
@@ -619,7 +768,7 @@ $: if (hasuraEnvironments) {
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                           <tr>
                             <td class="px-3 py-2 border-r border-gray-300 dark:border-gray-700">
-                              <button class="bg-blue-400 dark:bg-blue-600 text-white px-2 py-1 rounded" disabled>Test</button>
+                              <button class="bg-blue-400 dark:bg-blue-600 text-white px-2 py-1 rounded">Test</button>
                             </td>
                             <td class="px-3 py-2 border-r border-gray-300 dark:border-gray-700">{$selectedInfo.probeName}</td>
                             <td class="px-3 py-2 border-r border-gray-300 dark:border-gray-700">{$selectedInfo.probeType}</td>
@@ -720,10 +869,161 @@ $: if (hasuraEnvironments) {
                         <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
                       </div>
                     </div>
-                    <button on:click={saveEnvironmentInfo} class="btn-primary bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 dark:hover:bg-blue-800 text-white font-semibold py-2 px-4 rounded-md shadow-md transition duration-150 ease-in-out">Save Environment Info</button>
                   </div>
                 </div>
+              
+                <div class="bg-white dark:bg-gray-800 p-4">
+                  <div class="flex flex-col">
+                    <h1 class="text-xl font-bold text-[#FFAA33]">Sab BPM</h1>
+                    <p class="font-bold mt-2">These settings are only useful if SAB BPM is version 7.5.10 or higher.</p>
+                    <div class="space-y-1 py-1">
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Login :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Language :</label>
+                        <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                          <option></option>
+                        </select>
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Password :</label>
+                        <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              
+                <div class="bg-white dark:bg-gray-800 p-4 mt-0">
+                  <div class="flex flex-col">
+                    <div class="flex items-center gap-3 mb-2">
+                      <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">Test</button>
+                      <h1 class="text-xl font-bold text-[#FFAA33]">Host Database</h1>
+                    </div>
+                    <div class="space-y-1 py-0">
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Type:</label>
+                        <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                          <option></option>
+                        </select>
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Schema:</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Is secured:</label>
+                        <Checkbox class="align-middle transform scale-125" />
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Server name:</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
+                        <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              
+                <div class="bg-white dark:bg-gray-800 p-4 mt-0">
+                  <div class="flex flex-col">
+                    <div class="flex items-center gap-3 mb-2">
+                      <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">Test</button>
+                      <h1 class="text-xl font-bold text-[#FFAA33]">Telemaintenance Database</h1>
+                    </div>
+                    <div class="space-y-1 py-0">
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Type :</label>
+                        <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                          <option></option>
+                        </select>
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Login :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Schema :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Environment :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Is secured :</label>
+                        <Checkbox class="align-middle transform scale-125" />
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Server name :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Password :</label>
+                        <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              
+                <div class="bg-white dark:bg-gray-800 p-4 mt-0">
+                  <div class="flex flex-col">
+                    <div class="flex items-center gap-3 mb-2">
+                      <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">Test</button>
+                      <h1 class="text-xl font-bold text-[#FFAA33]">X3S Database</h1>
+                    </div>
+                    <div class="space-y-1 py-0">
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Type :</label>
+                        <select class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                          <option></option>
+                        </select>
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Login :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Schema :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Is secured :</label>
+                        <Checkbox class="align-middle transform scale-125" />
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Server name :</label>
+                        <input type="text" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                      <div class="flex items-center justify-start">
+                        <label class="text-gray-700 dark:text-gray-300 w-1/4">Password :</label>
+                        <input type="password" value="" class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+              
+                <div class="bg-white dark:bg-gray-800 p-4 mt-0">
+                    <div class="flex justify-start items-center space-x-4">
+                      <button class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">
+                        Test all
+                      </button>
+                      <button class="bg-white dark:bg-gray-800 text-black dark:text-white px-4 px-2 py-0 border border-gray-300 dark:border-gray-700 rounded focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
+                        Hide Referencing
+                      </button>
+                    </div>
+                    <button on:click={saveEnvironmentInfo} class="btn-primary bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 dark:hover:bg-blue-800 text-white font-semibold py-2 px-4 rounded-md shadow-md transition duration-150 ease-in-out mt-4">Save Environment Info</button>
+                  </div>
               </Tabs.Content>
+              
               <Tabs.Content value="delete">
                 <div class="p-4 bg-white dark:bg-gray-800">
                   <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Delete Environment</h2>

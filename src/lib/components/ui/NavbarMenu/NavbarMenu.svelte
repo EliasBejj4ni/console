@@ -14,6 +14,7 @@
 	import User from "lucide-svelte/icons/user";
 	import Settings from "lucide-svelte/icons/settings";
 	
+	
 	let sessionData = $page.data.session;
 
 	// @ts-ignore

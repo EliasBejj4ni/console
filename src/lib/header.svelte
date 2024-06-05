@@ -12,7 +12,7 @@
       <div class="flex items-center"> 
         <MenuItem {active} item="Administration ▼" >
           <div class="flex flex-col space-y-4 text-sm">
-            <HoveredLink href="/auth/console">Environment Management</HoveredLink>
+            <HoveredLink href="/auth/cons">Environment Management</HoveredLink>
           </div>
         </MenuItem>
       </div>
