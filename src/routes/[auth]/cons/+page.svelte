@@ -33,87 +33,6 @@ UPSERT_SSH_CONNECTION,
   import * as Tabs from "$lib/components/ui/tabs";
   import { get } from 'svelte/store';
   
-  const emptySSHConnection: SSHConnection = {
-    env_oid: 0,
-    con_oid: 0,
-    passphrase: null,
-    password: null,
-    private_key: null,
-    public_key: null,
-    username: '',
-    host: '',
-    port: 0,
-    auth_type: ''
-  };
-
-  const emptyDatabaseConnection: DatabaseConnection = {
-    env_oid: 0,
-    con_oid: 0,
-    type: '',
-    free_entry: false,
-    host: '',
-    port: 0,
-    username: '',
-    password: '',
-    url: null,
-    schema: null,
-    sid: null,
-    service: null,
-    secured: null
-  };
-
-  const emptySFTPConnection: SFTPConnection = {
-    env_oid: 0,
-    con_oid: 0,
-    ssh_con_oid: 0,
-    remote_directory: '',
-    is_active: false
-  };
-
-  const emptyBDDTLMConnection: BDDTLMConnection = {
-    env_oid: 0,
-    con_oid: 0,
-    bdd_con_oid: 0
-  };
-
-  const emptyBDDHostConnection: BDDHostConnection = {
-    env_oid: 0,
-    con_oid: 0,
-    bdd_con_oid: 0
-  };
-
-  const emptyBDDX3SConnection: BDDX3SConnection = {
-    con_oid: 0,
-    bdd_con_oid: 0,
-    env_oid: 0
-  };
-
-  const emptyWASConnection: WASConnection = {
-    env_oid: 0,
-    name: '',
-    con_oid: 0,
-    host: '',
-    port: 0,
-    security_enabled: false,
-    username: '',
-    password: '',
-    key_store_type: '',
-    ssl_config_url: '',
-    soap_config_url: '',
-    sas_config_url: '',
-    truststore: '',
-    truststore_password: '',
-    keystore: '',
-    keystore_password: ''
-  };
-
-  const emptyBPMConnection: BPMConnection = {
-  con_oid: 0,
-  env_oid: 0,
-  username: '',
-  password: '',
-  language: ''
-  };
 
   export const sshConnections = writable<SSHConnection[]>([]);
   export const databaseConnections = writable<DatabaseConnection[]>([]);
@@ -155,21 +74,6 @@ UPSERT_SSH_CONNECTION,
   bpmConnections: []
 });
  
- const defaultDatabaseConnection: DatabaseConnection = {
- env_oid: 0,
- con_oid: 0,
- type: '',
- free_entry: false,
- host: '',
- port: 0,
- username: '',
- password: '',
- url: null,
- schema: null,
- sid: null,
- service: null,
- secured: null
- };
 
   // Function to load environments
   export const loadEnvironments = async () => {
@@ -581,17 +485,7 @@ export const deleteEnvironment = async () => {
       
 
       selectedEnvironmentId.set(null);
-      // selectedInfo.set({
-      //   env_name: '',
-      //   host_type: '',
-      //   sshConnections: [],
-      //   databaseConnections: [],
-      //   sftpConnections: [],
-      //   bddtlmConnections: [],
-      //   bddhostConnections: [],
-      //   bddx3sConnections: [],
-      //   wasConnections: []
-      // });
+
     } catch (error) {
       console.error('Error deleting environment:', error);
     }
@@ -1041,7 +935,7 @@ export const deleteEnvironment = async () => {
                           </button>
                           <h2 class="text-lg font-bold dark:text-gray-300" style="font-size: 16px;">Websphere Access Information</h2>
                           <div class="font-bold underline text-[#FFAA33] mt-4" style="font-size: 16px;">General Information</div>
-                          {#each $selectedInfo.wasConnections as connection}
+                    
                             <div class="grid grid-cols-5 gap-4 mt-2 items-center">
                               <div class="col-span-1">
                                 <label class="text-gray-700 dark:text-gray-300">WAS Host :</label>
@@ -1092,7 +986,6 @@ export const deleteEnvironment = async () => {
                                 <input type="text" bind:value={connection.keystore_password} class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" />
                               </div>
                             </div>
-                          {/each}
                         </div>
                       </div>
                     {/if}

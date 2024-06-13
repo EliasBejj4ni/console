@@ -10,13 +10,48 @@ mutation DELETE_ENVIRONMENT($env_oid: bigint!) {
 `;
 
 export const CREATE_ENV = gql`
-  mutation CreateEnvironment($env_name: String!, $host_type: String!) {
-    insert_console_environment_one(object: {env_name: $env_name, host_type: $host_type}) {
+  mutation CreateEnvironment($env_name: String!) {
+    insert_console_environment_one(object: {env_name: $env_name}) {
       env_oid
       env_name
-      host_type
     }
   }
+`;
+
+export const UPDATE_INSTALLATION_INFO = gql`
+mutation UpdateInstallationConfiguration($instconfig_oid: bigint!, $integration_thread_number: Int!) {
+  update_console_installationconfiguration_by_pk(pk_columns: { instconfig_oid: $instconfig_oid }, _set: { integration_thread_number: $integration_thread_number }) {
+    instconfig_oid
+    integration_thread_number
+  }
+}
+`;
+
+export const UPDATE_INSTALLATION_CONFIGURATION = gql`
+  mutation UpdateInstallationConfiguration($instconfig_oid: bigint!, $integration_thread_number: Int!) {
+    update_console_installationconfiguration_by_pk(pk_columns: { instconfig_oid: $instconfig_oid }, _set: { integration_thread_number: $integration_thread_number }) {
+      instconfig_oid
+      integration_thread_number
+    }
+  }
+`;
+
+export const UPDATE_COMPONENT = gql`
+  mutation UpdateComponent($component_oid: bigint!, $value: String!) {
+    update_console_component_by_pk(pk_columns: { component_oid: $component_oid }, _set: { value: $value }) {
+      component_oid
+      value
+    }
+  }
+`;
+
+export const UPDATE_THREAD_NUMBER = gql`
+mutation UpdateApplicationParameterThreadNumber($appparam_oid: bigint!, $thread_number: Int!) {
+  update_console_applicationparameter_by_pk(pk_columns: { appparam_oid: $appparam_oid }, _set: { thread_number: $thread_number }) {
+    appparam_oid
+    thread_number
+  }
+}
 `;
 
 export const UPSERT_SSH_CONNECTION = gql`

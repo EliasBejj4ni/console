@@ -6,12 +6,12 @@ export const GET_ENV = gql`
         console_environment {
             env_oid
             env_name
-			host_type
-			creation_dt_hr
-			last_modified_dt_hr
-			latest_backup_dt_hr
-			dup_backup_oid
-			rest_backup_oid
+			      host_type
+			      creation_dt_hr
+			      last_modified_dt_hr
+			      latest_backup_dt_hr
+			      dup_backup_oid
+			      rest_backup_oid
           }
     }
 `;
@@ -97,6 +97,35 @@ export const GET_CONNECTIONS = gql`
           latest_backup_dt_hr
           rest_backup_oid
         }
+      }
+    }
+  }
+`;
+
+export const GET_INSTALLATION_INFO = gql`
+  query GetinstallationInfo($env_oid: bigint!) {
+    console_installationconfiguration(where: { env_oid: { _eq: $env_oid } }) {
+      env_oid
+      install_type_default
+      instconfig_oid
+      integration_thread_number
+      applicationparameters {
+        appparam_oid
+        config_files_dir
+        infra_type
+        instconfig_oid
+        thread_number
+        components {
+          appparam_oid
+          component_oid
+          server_type
+          type
+          value
+        }
+      }
+      environment {
+        env_name
+        host_type
       }
     }
   }

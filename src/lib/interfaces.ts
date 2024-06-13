@@ -87,3 +87,40 @@ export interface Environment {
     password: string;
     language: string;
 }
+
+// Parameter installation interfaces
+
+ export interface InstallationInfo {
+   env_oid: number;
+   install_type_default: string;
+   instconfig_oid: number;
+   integration_thread_number: number;
+   applicationparameters: ApplicationParameter[];
+   environment: {
+     env_name: string;
+     host_type: string;
+   };
+ }
+
+ export interface ApplicationParameter {
+   appparam_oid: number;
+   config_files_dir: string;
+   infra_type: string;
+   instconfig_oid: number;
+   thread_number: number;
+   components: Component[];
+ }
+
+ export interface Component {
+   appparam_oid: number;
+   component_oid: number;
+   server_type: string;
+   type: string;
+   value: string;
+ }
+
+ export interface InstallationData {
+   applicationparameters: ApplicationParameter[];
+ }
+
+ 
