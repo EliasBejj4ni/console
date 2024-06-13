@@ -39,12 +39,12 @@
   };
 
   function saveNewWasConnection() {
-    if (newWasConnection.host && newWasConnection.port) { // Validate required fields if needed
+    if (newWasConnection.host && newWasConnection.port) {
       const connections = get(connectionDetails);
-      connections.Was.push({ ...newWasConnection }); // Add the new connection
-      connectionDetails.set(connections); // Update the store
+      connections.Was.push({ ...newWasConnection }); 
+      connectionDetails.set(connections); 
 
-      // Reset the newWasConnection object for the next input
+      // Reset newWasConnection object for next input
       newWasConnection = {
         host: '',
         port: '',
@@ -84,7 +84,8 @@ webspherePopoverOpen = !webspherePopoverOpen;
     document.body.style.overflow = 'auto';
   }
 }
-// Load environments on component mount
+
+// Load environments on mount
 onMount(async () => {
         try {
     const result = await client.query({
@@ -293,7 +294,7 @@ async function insertAllConnections() {
         console.log(`${type} Specialized Connection Created:`, result);
       } catch (error) {
         console.error(`Failed to create ${type} specialized connection:`, error);
-        
+        return;
       }
     }
 
@@ -309,6 +310,7 @@ async function insertAllConnections() {
     console.log('BPM Connection Created:', bpmResult);
   } catch (error) {
     console.error('Failed to create BPM connection:', error);
+    return;
   }
 
   for (const wasConnection of get(connectionDetails).Was) {
@@ -341,11 +343,12 @@ async function insertAllConnections() {
     console.log('WAS Connection Created:', wasResult);
   } catch (error) {
     console.error('Failed to create WAS connection:', error);
+    return;
   }
 }
 
-/// Handle SSH connection creation
-const sshDetails = get(connectionDetails).SSH;
+     // SSH connection creation
+        const sshDetails = get(connectionDetails).SSH;
             try {
               console.log("Sending SSH details: ", sshDetails);
               const formattedSshDetails = {
@@ -369,7 +372,7 @@ const sshDetails = get(connectionDetails).SSH;
         
         console.log('SSH Connection Created:', sshResult);
 
-        // Handle SFTP connection creation if SSH is successful
+        // SFTP connection creation
         const sftpDetails = get(connectionDetails).SFTP;
         if (sshResult.data && sshResult.data.insert_console_sshconnection_one.con_oid) {
           const formattedSshDetails = {
@@ -388,6 +391,7 @@ const sshDetails = get(connectionDetails).SSH;
         }
     } catch (error) {
         console.error('Failed to create SSH/SFTP connection:', error);
+        return;
     }
 
     try {
@@ -403,7 +407,6 @@ const sshDetails = get(connectionDetails).SSH;
 
   const instConfigOid = instConfigResult.data.insert_console_installationconfiguration_one.instconfig_oid;
 
-  // Step 2: Populate Application Parameters
   const infraTypes = ["SDE", "Host", "FlowmindServer", "ConsoleLocale", "SabUnix", "WebServices", "X3", "X3S", "YourPortalBanker", "YourPortalCustomer"];
   const defaultParams = {
             thread_number: 1,
@@ -421,8 +424,6 @@ const sshDetails = get(connectionDetails).SSH;
             });
     const appParamOid = appParamResult.data.insert_console_applicationparameter_one.appparam_oid;
 
-    
-    // Step 3: Add Components for each Application Parameter based on infraType
     const components = getComponentsByInfraType(infraType, hostType);
             for (const component of components) {
                 await client.mutate({
@@ -440,7 +441,6 @@ const sshDetails = get(connectionDetails).SSH;
 } catch (error) {
   console.error('Failed to create installation configuration or parameters:', error);
 }
-
     console.log('All required connections have been successfully created.');
 
 }
