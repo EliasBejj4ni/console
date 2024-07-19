@@ -1,3 +1,4 @@
+//src/lib/types.ts
 import { writable, type Writable } from 'svelte/store';
 
 export type Environment = {
@@ -59,3 +60,25 @@ export type Environment = {
     service: Writable<string>;
     secured: Writable<boolean>;
   };
+  
+  type WasConnection = {
+    con_oid: number;
+    env_oid: number;
+    host: string;
+    key_store_type: string | null;
+    keystore: string;
+    keystore_password: string;
+    name: string;
+    password: string;
+    port: number;
+    remoteconnectionfeatures: any[]; 
+    sas_config_url: string;
+    security_enabled: boolean;
+    soap_config_url: string;
+    ssl_config_url: string;
+    truststore: string;
+    truststore_password: string;
+    username: string;
+    wasappserverconfigs: any[];
+  };
+  

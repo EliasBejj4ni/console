@@ -25,7 +25,7 @@ services:
       DB_PASSWORD: postgrespassword
     volumes:
       - keycloak_data:/opt/keycloak/data
-      - /home/ebejjani/certs:/etc/x509/https
+      # - /home/ebejjani/certs:/etc/x509/https
     ports:
       - "8081:8080"
       - "8443:8443"

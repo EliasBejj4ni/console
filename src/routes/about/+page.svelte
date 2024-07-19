@@ -1,34 +1,14 @@
 <script lang="ts">
-	import { signOut } from '@auth/sveltekit/client';
 	import { page } from '$app/stores';
 	import Landing from '$lib/images/console_landing.jpg';
 	import { goto } from '$app/navigation';
+	import { SignOut } from '@auth/sveltekit/components';
 
 	console.log($page.data.session);
     let sessionData = $page.data.session;
 
 	// @ts-ignore
 	let refreshToken = sessionData?.refreshToken ?? '';
-
-	async function handleSignOut() {
-
-    const response = await fetch('/auth/logout', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ refreshToken: refreshToken })
-    });
-	
-    if (response.ok) {
-		await signOut();
-        console.log('Logged out successfully, redirecting...');
-        goto('/login');
-    } else {
-        const { error } = await response.json();
-        console.error('Error signing out:', error);
-    }
-}
 </script>
 
 <div class="hero min-h-screen bg-cover bg-center" style="background-image: url({Landing})">
@@ -57,11 +37,14 @@
 
 		<div>
 			{#if $page.data.session}
-				<button
-					on:click={() => handleSignOut()}
-					class="rounded bg-blue-600 px-4 py-2 font-bold text-white shadow-lg hover:bg-blue-700"
-					>sign out</button
-				>
+				<SignOut>
+					<button
+						slot="submitButton"
+						class="rounded bg-blue-600 px-4 py-2 font-bold text-white shadow-lg hover:bg-blue-700"
+					>
+						Sign out
+					</button>
+				</SignOut>
 			{/if}
 		</div>
 	</div>

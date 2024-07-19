@@ -2,8 +2,8 @@
   import client from '$lib/apolloClient';
   import { GET_ENV, GET_CONNECTIONS } from '$lib/queries';
   import {
-CREATE_ENV,
-UPSERT_SSH_CONNECTION,
+  CREATE_ENV,
+  UPSERT_SSH_CONNECTION,
   UPSERT_SFTP_CONNECTION,
   UPSERT_BPM_CONNECTION,
   UPSERT_DATABASE_CONNECTION,
@@ -471,35 +471,63 @@ async function upsertConnections() {
   }
 }
 
-export const deleteEnvironment = async () => {
-  const envId = $selectedEnvironmentId;
-  if (envId !== null) {
-    try {
-      const result = await client.mutate({
-        mutation: DELETE_ENV,
-        variables: { env_oid: envId }
-      });
-      console.log('Deleted environment:', result);
-      await loadEnvironments();
-      environments.update(envs => envs.filter(env => env.env_oid !== envId));
-      
+let successMessage = writable('');
 
-      selectedEnvironmentId.set(null);
+const deleteEnvironment = async () => {
+    const envId = $selectedEnvironmentId;
+    if (envId !== null) {
+      const confirmDeletion = confirm('Are you sure you want to delete this environment?');
+      if (confirmDeletion) {
+        try {
+          const result = await client.mutate({
+            mutation: DELETE_ENV,
+            variables: { env_oid: envId }
+          });
+          console.log('Deleted environment:', result);
+          await loadEnvironments();
+          environments.update(envs => envs.filter(env => env.env_oid !== envId));
 
-    } catch (error) {
-      console.error('Error deleting environment:', error);
+          successMessage.set('Environment deleted successfully.');
+          selectedEnvironmentId.set(null);
+
+        } catch (error) {
+          console.error('Error deleting environment:', error);
+        }
+      }
     }
-  }
-    };
+  };
 
 </script>
+
+<div class="p-4 bg-white dark:bg-gray-800">
+  <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Delete Environment</h2>
+  <div class="mt-4">
+    <label for="environment-selector" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Select Environment to Delete:</label>
+    <select
+    id="environment-selector"
+    on:change={selectEnvironment}
+    bind:value={$selectedDuplicateEnvId}
+    class="px-3 py-0 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
+  >
+    <option value={null}>-- Select an Environment --</option>
+    {#each $environments as environment (environment.env_oid)}
+      <option value={environment.env_oid}>{environment.env_name}</option>
+    {/each}
+  </select>
+  </div>
+  <div class="text-red-400 ">{$successMessage}</div>
+  <button on:click={deleteEnvironment} disabled={!$selectedEnvironmentId} class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+    Delete
+  </button>
+  
+</div>
 
 <Tabs.Root value="display" class="w-full ">
 <Tabs.List class="grid w-full grid-cols-4 ">
   <!-- <Tabs.Trigger value="display">Display</Tabs.Trigger> -->
-  <Tabs.Trigger value="edit">Edit</Tabs.Trigger>
-  <Tabs.Trigger value="create">Create</Tabs.Trigger>
-  <Tabs.Trigger value="delete">Delete</Tabs.Trigger>
+  <!-- <Tabs.Trigger value="edit">Edit</Tabs.Trigger> -->
+  <!-- <Tabs.Trigger value="create">Create</Tabs.Trigger> -->
+  <!-- <Tabs.Trigger value="delete">Delete</Tabs.Trigger> -->
 </Tabs.List>
 <Tabs.Content value="edit"> 
   <div class="bg-white dark:bg-gray-800 p-4">
@@ -1048,26 +1076,7 @@ export const deleteEnvironment = async () => {
   </div>
 </Tabs.Content>
  <Tabs.Content value="delete">
-    <div class="p-4 bg-white dark:bg-gray-800">
-      <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Delete Environment</h2>
-      <div class="mt-4">
-        <label for="environment-selector" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Select Environment to Delete:</label>
-        <select
-        id="environment-selector"
-        on:change={selectEnvironment}
-        bind:value={$selectedDuplicateEnvId}
-        class="px-3 py-0 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
-      >
-        <option value={null}>-- Select an Environment --</option>
-        {#each $environments as environment (environment.env_oid)}
-          <option value={environment.env_oid}>{environment.env_name}</option>
-        {/each}
-      </select>
-      </div>
-      <button on:click={deleteEnvironment} disabled={!$selectedEnvironmentId} class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-        Delete
-      </button>
-    </div>
+   
   </Tabs.Content>
 
 </Tabs.Root>

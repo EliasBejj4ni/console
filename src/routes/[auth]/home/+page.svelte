@@ -33,7 +33,7 @@
 		const params = new URLSearchParams({
 			grant_type: 'refresh_token',
 			client_id: 'console',
-			client_secret: 'pu65BsPrjVgOD16WE98VlQOlbTNTLlKq',
+			client_secret: 'FODLhG4zJusErZ6Jocrhzl74XkT0itAD',
 			refresh_token: refreshToken
 		});
 
@@ -69,24 +69,6 @@
 		}
 	}
 
-	async function handleSignOut() {
-
-    const response = await fetch('/auth/logout', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ refreshToken: refreshToken })
-    });
-
-    if (response.ok) {
-        console.log('Logged out successfully, redirecting...');
-        goto('/login');
-    } else {
-        const { error } = await response.json();
-        console.error('Error signing out:', error);
-    }
-}
 
 </script>
 
@@ -101,7 +83,6 @@
 				<div
 					slot="submitButton"
 					class="rounded bg-blue-600 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:bg-blue-700"
-					on:click={handleSignOut}
 				>
 					Sign out
 				</div>

@@ -13,31 +13,9 @@
 	import LogOut from "lucide-svelte/icons/log-out";
 	import User from "lucide-svelte/icons/user";
 	import Settings from "lucide-svelte/icons/settings";
-	
-	
+	import { SignOut } from '@auth/sveltekit/components';
+
 	let sessionData = $page.data.session;
-
-	// @ts-ignore
-	let refreshToken = sessionData?.refreshToken ?? '';
-
-	async function handleSignOut() {
-		const response = await fetch('/auth/logout', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({ refreshToken: refreshToken })
-		});
-
-		await signOut();
-		if (response.ok) {
-			console.log('Logged out successfully, redirecting...');
-			goto('/login');
-		} else {
-			const { error } = await response.json();
-			console.error('Error signing out:', error);
-		}
-	}
 
 	let isDropdownOpen = false;
 	function toggleDropdown() {
@@ -63,14 +41,19 @@
     </Button>
   </DropdownMenu.Trigger>
   <DropdownMenu.Content class="w-48 bg-white dark:bg-black shadow-md rounded-md">
+	
 	<DropdownMenu.Item class="flex items-center text-gray-800 dark:text-white">
 		<Settings class="mr-2 h-4 w-4" />
 		<span>Profile Settings</span>
 	  </DropdownMenu.Item>
-    <DropdownMenu.Item on:click={handleSignOut} class="flex items-center text-gray-800 dark:text-white">
+	
+	<SignOut>
+    <DropdownMenu.Item slot="submitButton"   class="flex items-center text-gray-800 dark:text-white">
       <LogOut class="mr-2 h-4 w-4" />
       <span>Log out</span>
     </DropdownMenu.Item>
+	</SignOut>
+
   </DropdownMenu.Content>
 </DropdownMenu.Root>
 

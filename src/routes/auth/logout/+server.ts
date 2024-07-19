@@ -4,7 +4,7 @@ export async function POST(request) {
 
     const params = new URLSearchParams({
         client_id: 'console', 
-        client_secret: 'pu65BsPrjVgOD16WE98VlQOlbTNTLlKq', 
+        client_secret: 'XyfCsyEES97edvnCl9W0qmaerjlSdRbA', 
         refresh_token: refreshToken
     });
 
