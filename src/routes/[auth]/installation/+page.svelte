@@ -2,7 +2,7 @@
 import { writable, type Writable, get } from 'svelte/store';
 import client from '$lib/apolloClient';
 import { GET_ENV, GET_INSTALLATION_INFO } from '$lib/queries';
-import { UPDATE_COMPONENT, UPDATE_INSTALLATION_CONFIGURATION, UPDATE_THREAD_NUMBER } from '$lib/mutations';
+import { UPDATE_COMPONENT, UPDATE_THREAD_NUMBER } from '$lib/mutations';
 import { onMount } from 'svelte';
 import type { Environment, InstallationInfo, Component } from '$lib/interfaces';
 
@@ -606,9 +606,6 @@ onMount(() => {
             <div class="flex justify-start items-center space-x-4">
               <button  on:click={saveChanges} class="bg-blue-500 dark:bg-blue-700 text-white px-4 py-2 rounded focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm">
                 Validate
-              </button>
-              <button class="bg-white dark:bg-gray-800 text-black dark:text-white px-4 py-2 border border-gray-300 dark:border-gray-700 rounded focus:outline-none hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
-                Cancel
               </button>
             </div>
       </div>

@@ -31,13 +31,14 @@
         tomcatAppServerConfigs,
         wasAppServerConfigs,
         newlyAddedProbeSSHConnections,
-		type WebsphereConnectionInfo,
+		    type WebsphereConnectionInfo,
         type WebsphereAppServerConfig,
-        type TomcatAppServerConfig
+        type TomcatAppServerConfig,
+        type SSHConnectionInfo,
 
     } from '$lib/stores';
     import { GET_ENV, GET_ENV_DETAILS } from '$lib/queries';
-    import { UPDATE_ENVIRONMENT,UPDATE_SFTP_CONNECTION, UPDATE_SSH_CONNECTION, UPDATE_BPM_CONNECTION, UPDATE_DATABASE_CONNECTION, UPDATE_WAS_CONNECTION, UPDATE_REMOTE_CONNECTION_FEATURE, UPDATE_WAS_APP_SERVER_CONFIG, UPDATE_TOMCAT_APP_SERVER_CONFIG, DELETE_SSH_CONNECTION, DELETE_WAS_CONNECTION } from '$lib/mutation';
+    import { UPDATE_ENVIRONMENT,UPDATE_SFTP_CONNECTION, UPDATE_SSH_CONNECTION, UPDATE_BPM_CONNECTION, UPDATE_DATABASE_CONNECTION, UPDATE_WAS_CONNECTION, UPDATE_REMOTE_CONNECTION_FEATURE, UPDATE_WAS_APP_SERVER_CONFIG, UPDATE_TOMCAT_APP_SERVER_CONFIG, DELETE_SSH_CONNECTION, DELETE_WAS_CONNECTION, CREATE_WAS_CONNECTION } from '$lib/mutation';
     import * as Popover from "$lib/components/ui/popover";
     import { Checkbox } from "$lib/components/ui/checkbox";
     import { Progress } from '$lib/components/ui/progress';
@@ -46,56 +47,6 @@
     function handleApplicationChange(application: any) {
     newRemoteConnectionFeature.update(current => ({ ...current, probe_application: application }));
   }
-
-  // Modal open state
-let newProbeSSHModalOpen = false;
-
-// Function to open the modal
-function openNewProbeSSHModal() {
-    newProbeSSHModalOpen = true;
-}
-
-// Function to close the modal
-function closeNewProbeSSHModal() {
-    newProbeSSHModalOpen = false;
-}
-
-let appServerConfigTomcat = writable<TomcatAppServerConfig>({
-    feature_oid: 0,
-    server_name: '',
-    port: 0,
-    binary_location: '',
-    portlets_location: ''
-});
-let appServerConfigWebsphere = writable<WebsphereAppServerConfig>({
-    feature_oid: 0,
-    was_con_oid: 0,
-    upload_mode_enabled: false,
-    was_cell: '',
-    was_node: '',
-    was_cluster: '',
-    was_name: '',
-    targets: ''
-});
-
-
-function addNewProbeSSHConnection() {
-    const newConnection = get(newProbeSSHConnection);
-    newlyAddedProbeSSHConnections.update(connections => [...connections, { ...newConnection }]);
-
-    // Add the corresponding app server config to the separate list
-    if (newConnection.remoteConnectionFeature.type === 'Tomcat') {
-        tomcatAppServerConfigs.update(configs => [...configs, get(appServerConfigTomcat)]);
-    } else if (newConnection.remoteConnectionFeature.type === 'Websphere') {
-        wasAppServerConfigs.update(configs => [...configs, get(appServerConfigWebsphere)]);
-    }
-
-    console.log("Newly Added Probe SSH Connections:", get(newlyAddedProbeSSHConnections));
-    console.log("Tomcat App Server Configs:", get(tomcatAppServerConfigs));
-    console.log("Websphere App Server Configs:", get(wasAppServerConfigs));
-
-    closeNewProbeSSHModal();
-}
 
 
   async function deleteSSHConnection(con_oid: number) {
@@ -134,11 +85,13 @@ async function deleteWASConnection(con_oid: number) {
     }
 }
 
+
     let showProgressPopover = false;
     let progressValue = 0;
     let updateMessage = '';
     let viewingMode = false;
     let webspherePopoverOpen = false;
+    const isEditMode = writable(false);
     let sshPopoverOpen = false;
     let editingIndex = -1;
 
@@ -165,14 +118,84 @@ async function deleteWASConnection(con_oid: number) {
     }
 
      // Function to view WAS connection
-     function editWasConnection(wasConnection: WebsphereConnectionInfo) {
+     function openEditWASConnectionModal(wasConnection: WebsphereConnectionInfo) {
     viewingMode = false;
     newWasConnections.set(wasConnection); 
     toggleWebspherePopover(false);
     }
     
+      function openAddWASConnectionModal() {
+  // Set an empty WAS connection to indicate adding a new one
+  newWasConnections.set({
+    con_oid: 0,
+    env_oid: get(selectedEnvironmentId) || 0,
+    name: '',
+    host: '',
+    username: '',
+    password: '',
+    sslConfigUrl: '',
+    securityEnabled: false,
+    truststore: '',
+    keystore: '',
+    keystoreType: '',
+    port: 0,
+    soapConfigUrl: '',
+    sasConfigUrl: '',
+    truststorePassword: '',
+    keystorePassword: '',
+  });
+  viewingMode = false; 
+  webspherePopoverOpen = true; 
+    }
 
-    function toggleSSHPopover(isEdit = false) {
+    function handleSaveWasConnection() {
+  const currentConnection = get(newWasConnections);
+  const allConnections = get(wasConnections);
+  const temp_id = currentConnection.con_oid ? currentConnection.con_oid : Date.now();
+
+  const isDuplicateName = allConnections.some(conn => conn.name === currentConnection.name && conn.env_oid === currentConnection.env_oid && conn.con_oid !== currentConnection.con_oid);
+
+  if (isDuplicateName) {
+        errorMessage.set('A WAS connection with this name already exists.');
+        return;
+    }
+
+    errorMessage.set('');
+
+  if (currentConnection.con_oid) {
+    // This is an update
+    wasConnections.update(connections => 
+      connections.map(conn => conn.con_oid === currentConnection.con_oid ? currentConnection : conn)
+    );
+  } else {
+    // This is an addition
+    wasConnections.update(connections => [...connections, { ...currentConnection, con_oid: temp_id }]);
+  }
+
+  // Reset the newWasConnections store and close the modal
+  newWasConnections.set({
+    con_oid: 0,
+    env_oid: 0,
+    name: '',
+    host: '',
+    username: '',
+    password: '',
+    sslConfigUrl: '',
+    securityEnabled: false,
+    truststore: '',
+    keystore: '',
+    keystoreType: '',
+    port: 0,
+    soapConfigUrl: '',
+    sasConfigUrl: '',
+    truststorePassword: '',
+    keystorePassword: '',
+  });
+  webspherePopoverOpen = false;
+    }
+
+
+        function toggleSSHPopover(isEdit = false) {
     console.log("popover toggled");
     sshPopoverOpen = !sshPopoverOpen;
     if (sshPopoverOpen && !isEdit) {
@@ -184,7 +207,7 @@ async function deleteWASConnection(con_oid: number) {
         document.body.style.overflow = 'auto';
         errorMessage.set('');
     }
-}
+    }
 
     function resetSshConnection() {
   newSshConnections.set({
@@ -288,7 +311,7 @@ async function deleteWASConnection(con_oid: number) {
     }
 
 
-    function editSSHConnection(index: number) {
+    function openEditSSHConnectionModal(index: number) {
     const connectionToEdit = get(probeSSHConnections)[index];
     newSshConnections.set({ ...connectionToEdit });
     // Find the feature that matches the ssh_con_oid of the connection to edit
@@ -343,6 +366,9 @@ async function deleteWASConnection(con_oid: number) {
     editingIndex = index;
     toggleSSHPopover(true);
     }
+
+
+
 
     // Function to deep clone an object
     function deepClone<T>(obj: T): T {
@@ -405,7 +431,7 @@ async function deleteWASConnection(con_oid: number) {
         console.log('SFTP Connection:>>>>>>>>>>>>>>', sftpConn);
         console.log('SFTP Connection SSH OID:>>>>>>>', sftpConn.ssh_con_oid);
         // Filter out the SSH connection related to SFTP
-        const probeSSHConnectionsList = sshConnectionsList.filter(ssh => ssh.con_oid !== sftpConn.ssh_con_oid);
+        const probeSSHConnectionsList = sshConnectionsList.filter((ssh: any) => ssh.con_oid !== sftpConn.ssh_con_oid);
         console.log('Filtered probeSSHConnections:>>>>>>>', probeSSHConnectionsList);
         probeSSHConnections.set(probeSSHConnectionsList);
 
@@ -436,9 +462,9 @@ async function deleteWASConnection(con_oid: number) {
 
         tlmConnection.set(envDetails.bddtlmconnections[0] || { connectionType: "BDDTLM", type: "", freeEntry: false, host: '', port: '', username: '', password: '', url: '', schema: '', sid: '', service: '', secured: false });
         x3sConnection.set(envDetails.bddx3sconnections[0] || { connectionType: "BDDX3S", type: "", freeEntry: false, host: '', port: '', username: '', password: '', url: '', schema: '', sid: '', service: '', secured: false });
-        bpmConnection.set(envDetails.bpmconnections[0] || { language: "", username: "", password: "" });
         hostConnection.set(envDetails.bddhostconnections[0] || { connectionType: "BDDHOST", type: "", freeEntry: false, host: '', port: '', username: '', password: '', url: '', schema: '', sid: '', service: '', secured: false });
-     
+        bpmConnection.set(envDetails.bpmconnections[0] || { language: "", username: "", password: "" });
+       
         databaseConnections.set(envDetails.databaseconnections || []);
         remoteConnectionFeatures.set(
             envDetails.remoteconnectionfeatures.map((feature: any) => ({
@@ -510,21 +536,21 @@ async function deleteWASConnection(con_oid: number) {
 
         // Populate Host, TLM, X3S connections with the corresponding database connection data
         if (envDetails.bddhostconnections[0]) {
-            const hostDbConnection = envDetails.databaseconnections.find(db => db.con_oid === envDetails.bddhostconnections[0].bdd_con_oid);
+            const hostDbConnection = envDetails.databaseconnections.find((db: any) => db.con_oid === envDetails.bddhostconnections[0].bdd_con_oid);
             if (hostDbConnection) {
                 hostConnection.update(n => ({ ...n, ...hostDbConnection }));
             }
         }
 
         if (envDetails.bddtlmconnections[0]) {
-            const tlmDbConnection = envDetails.databaseconnections.find(db => db.con_oid === envDetails.bddtlmconnections[0].bdd_con_oid);
+            const tlmDbConnection = envDetails.databaseconnections.find((db: any) => db.con_oid === envDetails.bddtlmconnections[0].bdd_con_oid);
             if (tlmDbConnection) {
                 tlmConnection.update(n => ({ ...n, ...tlmDbConnection }));
             }
         }
 
         if (envDetails.bddx3sconnections[0]) {
-            const x3sDbConnection = envDetails.databaseconnections.find(db => db.con_oid === envDetails.bddx3sconnections[0].bdd_con_oid);
+            const x3sDbConnection = envDetails.databaseconnections.find((db: any) => db.con_oid === envDetails.bddx3sconnections[0].bdd_con_oid);
             if (x3sDbConnection) {
                 x3sConnection.update(n => ({ ...n, ...x3sDbConnection }));
             }
@@ -561,7 +587,7 @@ async function deleteWASConnection(con_oid: number) {
     }
 }
 
-async function updateEnvironmentDetails() {
+  async function updateEnvironmentDetails() {
     showProgressPopover = true;
         progressValue = 0;
         updateMessage = '';
@@ -647,7 +673,7 @@ async function updateEnvironmentDetails() {
           free_entry: hostDetails.freeEntry,
           host: hostDetails.host,
           port: hostDetails.port,
-          username: hostDetails.user,
+          username: hostDetails.username,
           password: hostDetails.password,
           url: hostDetails.url,
           schema: hostDetails.schema,
@@ -668,7 +694,7 @@ async function updateEnvironmentDetails() {
           free_entry: x3sDetails.freeEntry,
           host: x3sDetails.host,
           port: x3sDetails.port,
-          username: x3sDetails.user,
+          username: x3sDetails.username,
           password: x3sDetails.password,
           url: x3sDetails.url,
           schema: x3sDetails.schema,
@@ -689,7 +715,7 @@ async function updateEnvironmentDetails() {
           free_entry: tlmDetails.freeEntry,
           host: tlmDetails.host,
           port: tlmDetails.port,
-          username: tlmDetails.user,
+          username: tlmDetails.username,
           password: tlmDetails.password,
           url: tlmDetails.url,
           schema: tlmDetails.schema,
@@ -703,27 +729,52 @@ async function updateEnvironmentDetails() {
 
       // Update WAS connections
       for (const wasDetail of wasDetails) {
-        await client.mutate({
-          mutation: UPDATE_WAS_CONNECTION,
-          variables: {
-            con_oid: wasDetail.con_oid,
-            env_oid: wasDetail.env_oid,
-            name: wasDetail.name,
-            host: wasDetail.host,
-            port: wasDetail.port,
-            security_enabled: wasDetail.securityEnabled,
-            username: wasDetail.username,
-            password: wasDetail.password,
-            key_store_type: wasDetail.keystoreType,
-            ssl_config_url: wasDetail.sslConfigUrl,
-            soap_config_url: wasDetail.soapConfigUrl,
-            sas_config_url: wasDetail.sasConfigUrl,
-            truststore: wasDetail.truststore,
-            truststore_password: wasDetail.truststorePassword,
-            keystore: wasDetail.keystore,
-            keystore_password: wasDetail.keystorePassword
-          }
-        });
+        if (wasDetail.con_oid.toString().length >= 13) {
+                // create new was
+                await client.mutate({
+                    mutation: CREATE_WAS_CONNECTION,
+                    variables: {
+                        env_oid: get(selectedEnvironmentId),
+                        name: wasDetail.name,
+                        host: wasDetail.host,
+                        port: wasDetail.port,
+                        security_enabled: wasDetail.securityEnabled,
+                        username: wasDetail.username,
+                        password: wasDetail.password,
+                        key_store_type: wasDetail.keystoreType,
+                        ssl_config_url: wasDetail.sslConfigUrl,
+                        soap_config_url: wasDetail.soapConfigUrl,
+                        sas_config_url: wasDetail.sasConfigUrl,
+                        truststore: wasDetail.truststore,
+                        truststore_password: wasDetail.truststorePassword,
+                        keystore: wasDetail.keystore,
+                        keystore_password: wasDetail.keystorePassword
+                    }
+                });
+            } else {
+                // update existing was
+                await client.mutate({
+                    mutation: UPDATE_WAS_CONNECTION,
+                    variables: {
+                        con_oid: wasDetail.con_oid,
+                        env_oid: wasDetail.env_oid,
+                        name: wasDetail.name,
+                        host: wasDetail.host,
+                        port: wasDetail.port,
+                        security_enabled: wasDetail.securityEnabled,
+                        username: wasDetail.username,
+                        password: wasDetail.password,
+                        key_store_type: wasDetail.keystoreType,
+                        ssl_config_url: wasDetail.sslConfigUrl,
+                        soap_config_url: wasDetail.soapConfigUrl,
+                        sas_config_url: wasDetail.sasConfigUrl,
+                        truststore: wasDetail.truststore,
+                        truststore_password: wasDetail.truststorePassword,
+                        keystore: wasDetail.keystore,
+                        keystore_password: wasDetail.keystorePassword
+                    }
+                });
+            }
       }
 
       progressValue += 10;
@@ -768,6 +819,7 @@ async function updateEnvironmentDetails() {
                 }
             });
         } else {
+          
             console.error('Remote Connection Feature OID is null or undefined:', remoteFeatures);
         }
         progressValue += 10;
@@ -812,7 +864,7 @@ async function updateEnvironmentDetails() {
         errorMessage.set('Error updating environment details.');
         updateMessage = 'Error updating environment details: '+ error;
     }
-  }
+   }
 
     // Watch for changes in selected environment and load its details
     selectedEnvironmentId.subscribe(async (envId) => {
@@ -835,9 +887,6 @@ async function updateEnvironmentDetails() {
         if (value) console.log('Specific SSH Connection:', value);
     });
     $: if ($remoteConnectionFeatures.length > 0) console.log('Current Remote Connection Features:', $remoteConnectionFeatures);
-    $: sshConnection.subscribe(value => {
-        if (value) console.log('Specific SSH Connection:', value);
-    });
 
 
     async function testConnection(connection: any, index: number, connectionType: string) {
@@ -859,7 +908,7 @@ async function updateEnvironmentDetails() {
                     authType: connection.authType,
                     host: connection.host,
                     port: connection.port,
-                    user: connection.user,
+                    user: connection.username,
                     password: connection.password,
                     privateKey: connection.privateKey,
                     publicKey: connection.publicKey,
@@ -987,7 +1036,7 @@ async function testMailboxConnections() {
           authType: $sshConnection.authType,
           host: $sshConnection.host,
           port: $sshConnection.port,
-          user: $sshConnection.username,
+          username: $sshConnection.username,
           password: $sshConnection.password,
           privateKey: $sshConnection.privateKey,
           publicKey: $sshConnection.publicKey,
@@ -1001,7 +1050,7 @@ async function testMailboxConnections() {
           authType: $sshConnection.authType,
           host: $sshConnection.host,
           port: $sshConnection.port,
-          user: $sshConnection.username,
+          username: $sshConnection.username,
           password: $sshConnection.password,
           privateKey: $sshConnection.privateKey,
           publicKey: $sshConnection.publicKey,
@@ -1065,7 +1114,7 @@ async function testAllConnections() {
           freeEntry: $hostConnection.freeEntry,
           host: $hostConnection.host,
           port: $hostConnection.port,
-          user: $hostConnection.user,
+          user: $hostConnection.username,
           password: $hostConnection.password,
           schema: $hostConnection.schema,
           sid: $hostConnection.sid,
@@ -1079,7 +1128,7 @@ async function testAllConnections() {
           freeEntry: $tlmConnection.freeEntry,
           host: $tlmConnection.host,
           port: $tlmConnection.port,
-          user: $tlmConnection.user,
+          user: $tlmConnection.username,
           password: $tlmConnection.password,
           schema: $tlmConnection.schema,
           sid: $tlmConnection.sid,
@@ -1093,7 +1142,7 @@ async function testAllConnections() {
           freeEntry: $x3sConnection.freeEntry,
           host: $x3sConnection.host,
           port: $x3sConnection.port,
-          user: $x3sConnection.user,
+          user: $x3sConnection.username,
           password: $x3sConnection.password,
           schema: $x3sConnection.schema,
           sid: $x3sConnection.sid,
@@ -1163,7 +1212,180 @@ async function testAllConnections() {
   }
 }
 
+function addNewSSHConnection() {
+    const newConnection: SSHConnectionInfo = {
+        con_oid: Date.now(), // Temporary ID, to be replaced by actual ID from database
+        authType: 'Password', // Correctly typed as 'Password' | 'Identity'
+        host: '',
+        port: 22,
+        username: '',
+        password: '',
+        privateKey: '',
+        publicKey: '',
+        passphrase: ''
+    };
+    newSshConnections.set(newConnection);
 
+    const newFeature = {
+        ssh_con_oid: newConnection.con_oid,
+        was_con_oid: 0,
+        propagation: false,
+        installation: false,
+        dmgr: false,
+        instance_name: '',
+        type: '',
+        app_server: '',
+        is_main: false,
+        probe_application: ''
+    };
+    newRemoteConnectionFeature.set(newFeature);
+
+    const newWasConfig = {
+        was_config_oid: 0,
+        feature_oid: 0,
+        was_con_oid: 0,
+        upload_mode_enabled: false,
+        was_cell: '',
+        was_node: '',
+        was_cluster: '',
+        was_name: '',
+        targets: '',
+    };
+    newWasAppServerConfig.set(newWasConfig);
+
+    const newTomcatConfig = {
+        tomcat_config_oid: 0,
+        feature_oid: 0,
+        server_name: '',
+        port: 22,
+        binary_location: '',
+        portlets_location: '',
+    };
+    newTomcatAppServerConfig.set(newTomcatConfig);
+
+    toggleSSHPopover(false);
+}
+
+function handleSaveSSHConnection() {
+        const currentConnection = get(newSshConnections);
+        const allConnections = get(sshConnections);
+        const temp_id = currentConnection.con_oid ? currentConnection.con_oid : Date.now();
+
+
+        const isDuplicateName = allConnections.some(conn => conn.host === currentConnection.host && conn.con_oid !== currentConnection.con_oid);
+
+        if (isDuplicateName) {
+            errorMessage.set('An SSH connection with this host already exists.');
+            return;
+        }
+
+        errorMessage.set('');
+
+        if (currentConnection.con_oid) {
+            // This is an update
+            sshConnections.update(connections => 
+                connections.map(conn => conn.con_oid === currentConnection.con_oid ? currentConnection : conn)
+            );
+        } else {
+            // This is an addition
+            // sshConnections.update(connections => [...connections, { ...currentConnection }]);
+            sshConnections.update(connections => [...connections, { ...currentConnection, con_oid: temp_id }]);
+        }
+
+        // Also update probeSSHConnections
+        const probeConnections = get(probeSSHConnections);
+        probeSSHConnections.set([...probeConnections, currentConnection]);
+
+        // Save to local storage
+        localStorage.setItem('probeSSHConnections', JSON.stringify(get(probeSSHConnections)));
+        console.log('Updated probeSSHConnections:', get(probeSSHConnections));
+        
+       // Add the new feature to remoteConnectionFeatures and log the updated features
+    const currentFeature = get(newRemoteConnectionFeature);
+    const featureTempId = Date.now();
+    remoteConnectionFeatures.update(features => {
+        const updatedFeatures = [...features, { ...currentFeature, feature_oid: featureTempId }];
+        console.log('Updated Remote Connection Features:', updatedFeatures);
+        return updatedFeatures;
+    });
+
+    // Save the updated features to local storage
+    localStorage.setItem('remoteConnectionFeatures', JSON.stringify(get(remoteConnectionFeatures)));
+
+    // Add the app server config based on the type
+    if (currentFeature.type === 'Websphere') {
+        const currentWasConfig = get(newWasAppServerConfig);
+        const wasConfigTempId = Date.now() + 1; 
+        wasAppServerConfigs.update(configs => {
+            const updatedConfigs = [...configs, { ...currentWasConfig, feature_oid: featureTempId, was_config_oid: wasConfigTempId }];
+            console.log('Updated Websphere App Server Configs:', updatedConfigs);
+            return updatedConfigs;
+        });
+    } else if (currentFeature.type === 'Tomcat') {
+        const currentTomcatConfig = get(newTomcatAppServerConfig);
+        const tomcatConfigTempId = Date.now() + 1;
+        tomcatAppServerConfigs.update(configs => {
+            const updatedConfigs = [...configs, { ...currentTomcatConfig, feature_oid: featureTempId, tomcat_config_oid: tomcatConfigTempId }];
+            console.log('Updated Tomcat App Server Configs:', updatedConfigs);
+            return updatedConfigs;
+        });
+    }
+
+    // Save the updated configs to local storage
+    localStorage.setItem('wasAppServerConfigs', JSON.stringify(get(wasAppServerConfigs)));
+    localStorage.setItem('tomcatAppServerConfigs', JSON.stringify(get(tomcatAppServerConfigs)));
+
+    
+        // Reset the newSshConnections store and close the modal
+        newSshConnections.set({
+            con_oid: 0,
+            authType: 'Password',
+            host: '',
+            port: 22,
+            username: '',
+            password: '',
+            privateKey: '',
+            publicKey: '',
+            passphrase: ''
+        });
+
+        newRemoteConnectionFeature.set({
+        ssh_con_oid: 0,
+        was_con_oid: 0,
+        propagation: false,
+        installation: false,
+        dmgr: false,
+        instance_name: '',
+        type: '',
+        app_server: '',
+        is_main: false,
+        probe_application: ''
+    });
+
+    newWasAppServerConfig.set({
+        was_config_oid: 0,
+        feature_oid: 0,
+        was_con_oid: 0,
+        upload_mode_enabled: false,
+        was_cell: '',
+        was_node: '',
+        was_cluster: '',
+        was_name: '',
+        targets: '',
+    });
+
+    newTomcatAppServerConfig.set({
+        tomcat_config_oid: 0,
+        feature_oid: 0,
+        server_name: '',
+        port: 22,
+        binary_location: '',
+        portlets_location: '',
+    });
+
+
+        toggleSSHPopover(false);
+    }
 
 </script>
 
@@ -1373,7 +1595,7 @@ async function testAllConnections() {
                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Username:</label>
                          <input 
                            type="text" 
-                           bind:value={$hostConnection.user} 
+                           bind:value={$hostConnection.username} 
                            class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" 
                            required>
                        </div>
@@ -1381,7 +1603,7 @@ async function testAllConnections() {
                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
                          <input 
                            type="password" 
-                           bind:value={$hostConnection.user} 
+                           bind:value={$hostConnection.password} 
                            class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" 
                            required>
                        </div>
@@ -1482,7 +1704,7 @@ async function testAllConnections() {
                     <label class="text-gray-700 dark:text-gray-300 w-1/4">Username:</label>
                     <input 
                       type="text" 
-                      bind:value={$x3sConnection.user} 
+                      bind:value={$x3sConnection.username} 
                       class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" 
                       required>
                   </div>
@@ -1592,7 +1814,7 @@ async function testAllConnections() {
         <label class="text-gray-700 dark:text-gray-300 w-1/4">Username:</label>
         <input 
           type="text" 
-          bind:value={$tlmConnection.user} 
+          bind:value={$tlmConnection.username} 
           class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" 
           required>
       </div>
@@ -1631,6 +1853,7 @@ async function testAllConnections() {
       </div>
                </div>
              </div>
+             <button type="button" on:click={openAddWASConnectionModal} class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-700">Add</button>
 
              <Popover.Root>
                 {#if webspherePopoverOpen}
@@ -1652,6 +1875,7 @@ async function testAllConnections() {
                           <span class="block sm:inline">{$errorMessage}</span>
                         </div>
                       {/if}
+                      
               
                       <div class="grid grid-cols-5 gap-4 mt-2 items-center">
                         <div class="col-span-1">
@@ -1709,8 +1933,9 @@ async function testAllConnections() {
                       </div>
                       {#if !viewingMode}
                         <button 
-                          class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"  on:click={() => toggleWebspherePopover(false)}>
-                          Submit
+                          class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"  
+                          on:click={handleSaveWasConnection}>
+                          Submit 
                         </button>
                       {/if}
                     </div>
@@ -1718,7 +1943,7 @@ async function testAllConnections() {
                 {/if}
              </Popover.Root>
             
-
+            
             <!-- WAI Table -->
              <div class="overflow-x-auto mb-6 mt-4">
                 <h4 class="font-bold underline text-[#FFAA33] mt-4">WAS Connections</h4>
@@ -1735,7 +1960,7 @@ async function testAllConnections() {
                                 <td class="px-4 py-2 border border-gray-300 dark:border-gray-700">{wasConnection.name || 'N/A'}</td>
                                 <td class="px-4 py-2 border border-gray-300 dark:border-gray-700">
                                     <button type="button" on:click={() => viewWasConnection(wasConnection)} class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-700">Display</button>
-                                    <button type="button" on:click={() => editWasConnection(wasConnection)} class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-700">Edit</button>
+                                    <button type="button" on:click={() => openEditWASConnectionModal(wasConnection)} class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-700">Edit</button>
                                    <button type="button" on:click={() => deleteWASConnection(wasConnection.con_oid)} class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700">Delete</button>
                                 </td>
                             </tr>
@@ -1744,322 +1969,260 @@ async function testAllConnections() {
                 </table>
              </div>
 
+             <button type="button" on:click={addNewSSHConnection} class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-700">Add SSH Connection</button>
+
              <!-- SSH Connection Modal -->
-            <Popover.Root>
-    {#if sshPopoverOpen}
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="relative p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 max-w-4xl w-full">
-            <button
-                class="absolute top-3 right-3 text-gray-800 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-400"
-                on:click={() => toggleSSHPopover(false)}
-            >
-                <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-            <h1 class="text-lg font-bold dark:text-gray-300">SSH Connections Information</h1>
-<h1 class="text-xl font-bold text-[#FFAA33]">SSH Connection</h1>
-
-<div class="flex items-center mb-4">
-    <label class="text-gray-700 dark:text-gray-300 w-1/4">Authentication Type:</label>
-    <select bind:value={$newSshConnections.authType} on:change={() => {
-        const index = editingIndex;
-        probeSSHConnections.update(conns => {
-            conns[index].authType = $newSshConnections.authType;
-            return conns;
-        });
-    }} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}>
-        <option value="Password">Password</option>
-        <option value="Identity">Key</option>
-    </select>
-</div>
-<div class="flex items-center mb-4">
-    <label class="text-gray-700 dark:text-gray-300 w-1/4">Host: </label>
-    <input
-    type="text" bind:value={$newSshConnections.host} on:input={() => {
-        const index = editingIndex;
-        probeSSHConnections.update(conns => {
-            conns[index].host = $newSshConnections.host;
-            return conns;
-        });
-    }}
-    class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}
-  />
-  </div>
-  <div class="flex items-center mb-4">
-    <label class="text-gray-700 dark:text-gray-300 w-1/4">Port:</label>
-    <input
-    type="number" bind:value={$newSshConnections.port} on:input={() => {
-        const index = editingIndex;
-        probeSSHConnections.update(conns => {
-            conns[index].port = $newSshConnections.port;
-            return conns;
-        });
-    }}
-    class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}
-  />
-  </div>
-  <div class="flex items-center mb-4">
-    <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
-    <input
-    type="text" bind:value={$newSshConnections.username} on:input={() => {
-        const index = editingIndex;
-        probeSSHConnections.update(conns => {
-            conns[index].username = $newSshConnections.username;
-            return conns;
-        });
-    }}
-    class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}
-  />
-  </div>
-  {#if $newSshConnections.authType === 'Password'}
-    <div class="flex items-center mb-4">
-      <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
-      <input
-        type="password" bind:value={$newSshConnections.password} on:input={() => {
-            const index = editingIndex;
-            probeSSHConnections.update(conns => {
-                conns[index].password = $newSshConnections.password;
-                return conns;
-            });
-        }}
-        class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}
-      />
-    </div>
-  {:else}
-    <div class="flex items-center mb-4">
-      <label class="text-gray-700 dark:text-gray-300 w-1/4">Public Key:</label>
-      <input
-      type="text" bind:value={$newSshConnections.publicKey} on:input={() => {
-          const index = editingIndex;
-          probeSSHConnections.update(conns => {
-              conns[index].publicKey = $newSshConnections.publicKey;
-              return conns;
-          });
-      }}
-      class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}
-    />
-    </div>
-    <div class="flex items-center mb-4">
-      <label class="text-gray-700 dark:text-gray-300 w-1/4">Private Key:</label>
-      <input
-      type="text" bind:value={$newSshConnections.privateKey} on:input={() => {
-          const index = editingIndex;
-          probeSSHConnections.update(conns => {
-              conns[index].privateKey = $newSshConnections.privateKey;
-              return conns;
-          });
-      }}
-      class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}
-    />
-    </div>
-    <div class="flex items-center mb-4">
-      <label class="text-gray-700 dark:text-gray-300 w-1/4">Passphrase:</label>
-      <input
-      type="text" bind:value={$newSshConnections.passphrase} on:input={() => {
-          const index = editingIndex;
-          probeSSHConnections.update(conns => {
-              conns[index].passphrase = $newSshConnections.passphrase;
-              return conns;
-          });
-      }}
-      class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}
-    />
-    </div>
-  {/if}
-
-              <div class="mt-4">
-                <div class="text-[#FFAA33] font-bold underline mt-4">General Information</div>
-                <div class="flex items-center mb-4">
-                    <label class="text-gray-700 dark:text-gray-300 w-1/4">Instance name:</label>
-                    <input type="text" bind:value={$newRemoteConnectionFeature.instance_name} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled={viewingMode}/>
-                </div>
-                <div class="flex items-center mb-4">
-                    <label class="text-gray-700 dark:text-gray-300 w-1/4">Type:</label>
-                    <select bind:value={$newRemoteConnectionFeature.type} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled={viewingMode}>
-                        <option value="Tomcat">Tomcat</option>
-                        <option value="Websphere">Websphere</option>
-                    </select>
-                </div>
-                <div class="flex items-center mb-4">
-                    <label class="text-gray-700 dark:text-gray-300 w-1/4">Is the main:</label>
-                    <Checkbox bind:checked={$newRemoteConnectionFeature.is_main} class="align-middle transform scale-100" disabled={viewingMode}/>
-                </div>
-
-                <div class="text-[#FFAA33] font-bold underline mt-4">Probe applications</div>
-                <div class="grid grid-cols-6 gap-4 mt-2 items-center mb-4">
-                  {#if $newRemoteConnectionFeature.type === 'Tomcat'}
-                  <div>
-                    <label class="text-gray-700 dark:text-gray-300">YPC:</label>
-                    <input type="checkbox" class="align-middle transform scale-100" 
-                           checked={$newRemoteConnectionFeature.probe_application === 'YPC'}
-                           on:change={() => handleApplicationChange('YPC')} disabled/>
+             <Popover.Root>
+              {#if sshPopoverOpen}
+              <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div class="relative p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 max-w-4xl w-full">
+                      <button
+                          class="absolute top-3 right-3 text-gray-800 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-400"
+                          on:click={() => toggleSSHPopover(false)}
+                      >
+                          <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                      </button>
+                      <h1 class="text-lg font-bold dark:text-gray-300">SSH Connections Information</h1>
+                      <h1 class="text-xl font-bold text-[#FFAA33]">SSH Connection</h1>
+          
+                      {#if $errorMessage}
+                          <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                              <span class="block sm:inline">{$errorMessage}</span>
+                          </div>
+                      {/if}
+          
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Authentication Type:</label>
+                          <select bind:value={$newSshConnections.authType} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}>
+                              <option value="Password">Password</option>
+                              <option value="Identity">Key</option>
+                          </select>
+                      </div>
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Host: </label>
+                          <input type="text" bind:value={$newSshConnections.host} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                      </div>
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Port:</label>
+                          <input type="number" bind:value={$newSshConnections.port} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                      </div>
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
+                          <input type="text" bind:value={$newSshConnections.username} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                      </div>
+                      {#if $newSshConnections.authType === 'Password'}
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
+                          <input type="password" bind:value={$newSshConnections.password} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                      </div>
+                      {:else}
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Public Key:</label>
+                          <input type="text" bind:value={$newSshConnections.publicKey} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                      </div>
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Private Key:</label>
+                          <input type="text" bind:value={$newSshConnections.privateKey} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                      </div>
+                      <div class="flex items-center mb-4">
+                          <label class="text-gray-700 dark:text-gray-300 w-1/4">Passphrase:</label>
+                          <input type="text" bind:value={$newSshConnections.passphrase} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                      </div>
+                      {/if}
+          
+                      <div class="mt-4">
+                          <div class="text-[#FFAA33] font-bold underline mt-4">General Information</div>
+                          <div class="flex items-center mb-4">
+                              <label class="text-gray-700 dark:text-gray-300 w-1/4">Instance name:</label>
+                              <input type="text" bind:value={$newRemoteConnectionFeature.instance_name} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled={viewingMode}/>
+                          </div>
+                          <div class="flex items-center mb-4">
+                              <label class="text-gray-700 dark:text-gray-300 w-1/4">Type:</label>
+                              <select bind:value={$newRemoteConnectionFeature.type} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" disabled={viewingMode}>
+                                  <option value="Tomcat">Tomcat</option>
+                                  <option value="Websphere">Websphere</option>
+                              </select>
+                          </div>
+                          <div class="flex items-center mb-4">
+                              <label class="text-gray-700 dark:text-gray-300 w-1/4">Is the main:</label>
+                              <Checkbox bind:checked={$newRemoteConnectionFeature.is_main} class="align-middle transform scale-100" disabled={viewingMode}/>
+                          </div>
+          
+                          <div class="text-[#FFAA33] font-bold underline mt-4">Probe applications</div>
+                          <div class="grid grid-cols-6 gap-4 mt-2 items-center mb-4">
+                              {#if $newRemoteConnectionFeature.type === 'Tomcat'}
+                              <div>
+                                  <label class="text-gray-700 dark:text-gray-300">YPC:</label>
+                                  <input type="checkbox" class="align-middle transform scale-100" 
+                                         checked={$newRemoteConnectionFeature.probe_application === 'YPC'}
+                                         on:change={() => handleApplicationChange('YPC')} disabled/>
+                              </div>
+                              {:else}
+                              <div>
+                                  <label class="text-gray-700 dark:text-gray-300">BPM:</label>
+                                  <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
+                                         checked={$newRemoteConnectionFeature.probe_application === 'BPM'}
+                                         on:change={() => handleApplicationChange('BPM')}/>
+                              </div>
+                              <div>
+                                  <label class="text-gray-700 dark:text-gray-300">SDE:</label>
+                                  <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
+                                         checked={$newRemoteConnectionFeature.probe_application === 'SDE'}
+                                         on:change={() => handleApplicationChange('SDE')}/>
+                              </div>
+                              <div>
+                                  <label class="text-gray-700 dark:text-gray-300">X3:</label>
+                                  <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
+                                         checked={$newRemoteConnectionFeature.probe_application === 'X3'}
+                                         on:change={() => handleApplicationChange('X3')}/>
+                              </div>
+                              <div>
+                                  <label class="text-gray-700 dark:text-gray-300">X3S:</label>
+                                  <input type="checkbox" class="align-middle transform scale-100"
+                                         checked={$newRemoteConnectionFeature.probe_application === 'X3S'} disabled={viewingMode}
+                                         on:change={() => handleApplicationChange('X3S')}/>
+                              </div>
+                              <div>
+                                  <label class="text-gray-700 dark:text-gray-300">YPB:</label>
+                                  <input type="checkbox" class="align-middle transform scale-100"
+                                         checked={$newRemoteConnectionFeature.probe_application === 'YPB'} disabled={viewingMode}
+                                         on:change={() => handleApplicationChange('YPB')}/>
+                              </div>
+                              {/if}
+                          </div>
+          
+                          {#if $newRemoteConnectionFeature.type === 'Websphere'}
+                          <div class="text-[#FFAA33] font-bold underline mt-6">Probe features</div>
+                          <div class="grid grid-cols-1 gap-4 mt-2">
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">Propagation of the configuration:</label>
+                                  <Checkbox bind:checked={$newRemoteConnectionFeature.propagation} class="align-middle transform scale-100" disabled />
+                              </div>
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">Installation of resources / components:</label>
+                                  <Checkbox bind:checked={$newRemoteConnectionFeature.installation} class="align-middle transform scale-100" disabled={viewingMode} />
+                              </div>
+                              {#if $newRemoteConnectionFeature.probe_application === 'X3S' || $newRemoteConnectionFeature.probe_application === 'YPB'}
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">Installation DMGR Websphere (only for X3S / YPB):</label>
+                                  <Checkbox bind:checked={$newRemoteConnectionFeature.dmgr} class="align-middle transform scale-100" disabled={viewingMode} />
+                              </div>
+                              {/if}
+                          </div>
+                          {:else if $newRemoteConnectionFeature.type === 'Tomcat'}
+                          <div class="text-[#FFAA33] font-bold underline mt-6">Probe features</div>
+                          <div class="grid grid-cols-1 gap-4 mt-2">
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">Propagation of the configuration:</label>
+                                  <Checkbox bind:checked={$newRemoteConnectionFeature.propagation} class="align-middle transform scale-100" disabled />
+                              </div>
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">Installation of resources / components:</label>
+                                  <Checkbox bind:checked={$newRemoteConnectionFeature.installation} class="align-middle transform scale-100" disabled={viewingMode}/>
+                              </div>
+                          </div>
+                          {/if}
+                      </div>
+          
+                      {#if $newRemoteConnectionFeature.type === 'Websphere'}
+                      <div class="text-[#FFAA33] font-bold underline mt-6">WebSphere</div>
+                      <div class="grid grid-cols-1 gap-4 mt-2">
+                          <div>
+                              <label class="block text-gray-700 dark:text-gray-300">Upload Mode enabled:</label>
+                              <Checkbox bind:checked={$newWasAppServerConfig.upload_mode_enabled} class="align-middle transform scale-100" disabled={viewingMode}/>
+                          </div>
+                          <div class="grid grid-cols-3 gap-4">
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">WAS Cell:</label>
+                                  <input bind:value={$newWasAppServerConfig.was_cell}
+                                      type="text"
+                                      class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                                  />
+                              </div>
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">WAS Node:</label>
+                                  <input bind:value={$newWasAppServerConfig.was_node}
+                                      type="text"
+                                      class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                                  />
+                              </div>
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">WAS Cluster:</label>
+                                  <input bind:value={$newWasAppServerConfig.was_cluster}
+                                      type="text"
+                                      class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode}
+                                  />
+                              </div>
+                          </div>
+                          <div class="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">WAS Name:</label>
+                                  <input bind:value={$newWasAppServerConfig.was_name}
+                                      type="text"
+                                      class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                                  />
+                              </div>
+                              <div>
+                                  <label class="block text-gray-700 dark:text-gray-300">WebSphere Access Information:</label>
+                                  <input
+                                      bind:value={$newWasAppServerConfig.was_config_oid}
+                                      class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                                  />
+                              </div>
+                          </div>
+                          <div>
+                              <label class="block text-gray-700 dark:text-gray-300">Targets:</label>
+                              <textarea bind:value={$newWasAppServerConfig.targets}
+                              class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode}></textarea>
+                          </div>
+                      </div>
+                      {/if}
+                      
+                      {#if $newRemoteConnectionFeature.type === 'Tomcat'}
+                      <div class="text-[#FFAA33] font-bold underline mt-6">Tomcat</div>
+                      <div class="grid grid-cols-2 gap-4 mt-2">
+                          <div class="col-span-1">
+                              <label class="text-gray-700 dark:text-gray-300">Server name: </label>
+                              <input bind:value={$newTomcatAppServerConfig.server_name}
+                                  type="text"
+                                  class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                              />
+                          </div>
+                          <div class="col-span-1">
+                              <label class="text-gray-700 dark:text-gray-300">Port:</label>
+                              <input bind:value={$newTomcatAppServerConfig.port}
+                                  type="number" min="0"
+                                  class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                              />
+                          </div>
+                          <div class="col-span-2">
+                              <label class="block text-gray-700 dark:text-gray-300">Tomcat binary location:</label>
+                              <input bind:value={$newTomcatAppServerConfig.binary_location}
+                                  type="text"
+                                  class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                              />
+                          </div>
+                          <div class="col-span-2">
+                              <label class="block text-gray-700 dark:text-gray-300">Portlets location:</label>
+                              <input bind:value={$newTomcatAppServerConfig.portlets_location}
+                                  type="text"
+                                  class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                              />
+                          </div>
+                      </div>
+                      {/if}
+                      {#if !viewingMode}
+                      <button
+                      class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" on:click={handleSaveSSHConnection}>
+                          Submit
+                      </button>
+                      {/if}
                   </div>
-                  {:else}
-                  <div>
-                    <label class="text-gray-700 dark:text-gray-300">BPM:</label>
-                    <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
-                           checked={$newRemoteConnectionFeature.probe_application === 'BPM'}
-                           on:change={() => handleApplicationChange('BPM')}/>
-                  </div>
-                  <div>
-                    <label class="text-gray-700 dark:text-gray-300">SDE:</label>
-                    <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
-                           checked={$newRemoteConnectionFeature.probe_application === 'SDE'}
-                           on:change={() => handleApplicationChange('SDE')}/>
-                  </div>
-                  <div>
-                    <label class="text-gray-700 dark:text-gray-300">X3:</label>
-                    <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
-                           checked={$newRemoteConnectionFeature.probe_application === 'X3'}
-                           on:change={() => handleApplicationChange('X3')}/>
-                  </div>
-                  <div>
-                    <label class="text-gray-700 dark:text-gray-300">X3S:</label>
-                    <input type="checkbox" class="align-middle transform scale-100"
-                           checked={$newRemoteConnectionFeature.probe_application === 'X3S'} disabled={viewingMode}
-                           on:change={() => handleApplicationChange('X3S')}/>
-                  </div>
-                  <div>
-                    <label class="text-gray-700 dark:text-gray-300">YPB:</label>
-                    <input type="checkbox" class="align-middle transform scale-100"
-                           checked={$newRemoteConnectionFeature.probe_application === 'YPB'} disabled={viewingMode}
-                           on:change={() => handleApplicationChange('YPB')}/>
-                  </div>
-                  {/if}
-                </div>
-
-                {#if $newRemoteConnectionFeature.type === 'Websphere'}
-                <div class="text-[#FFAA33] font-bold underline mt-6">Probe features</div>
-                <div class="grid grid-cols-1 gap-4 mt-2">
-                  <div>
-                    <label class="block text-gray-700 dark:text-gray-300">Propagation of the configuration:</label>
-                    <Checkbox bind:checked={$newRemoteConnectionFeature.propagation} class="align-middle transform scale-100" disabled />
-                  </div>
-                  <div>
-                    <label class="block text-gray-700 dark:text-gray-300">Installation of resources / components:</label>
-                    <Checkbox bind:checked={$newRemoteConnectionFeature.installation} class="align-middle transform scale-100" disabled={viewingMode} />
-                  </div>
-                  {#if $newRemoteConnectionFeature.probe_application === 'X3S' || $newRemoteConnectionFeature.probe_application === 'YPB'}
-                  <div>
-                    <label class="block text-gray-700 dark:text-gray-300">Installation DMGR Websphere (only for X3S / YPB):</label>
-                    <Checkbox bind:checked={$newRemoteConnectionFeature.dmgr} class="align-middle transform scale-100" disabled={viewingMode} />
-                  </div>
-                  {/if}
-                </div>
-              {:else if $newRemoteConnectionFeature.type === 'Tomcat'}
-                <div class="text-[#FFAA33] font-bold underline mt-6">Probe features</div>
-                <div class="grid grid-cols-1 gap-4 mt-2">
-                  <div>
-                    <label class="block text-gray-700 dark:text-gray-300">Propagation of the configuration:</label>
-                    <Checkbox bind:checked={$newRemoteConnectionFeature.propagation} class="align-middle transform scale-100" disabled />
-                  </div>
-                  <div>
-                    <label class="block text-gray-700 dark:text-gray-300">Installation of resources / components:</label>
-                    <Checkbox bind:checked={$newRemoteConnectionFeature.installation} class="align-middle transform scale-100" disabled={viewingMode}/>
-                  </div>
-                </div>
+              </div>
               {/if}
-            </div>
-
-            {#if $newRemoteConnectionFeature.type === 'Websphere'}
-            <div class="text-[#FFAA33] font-bold underline mt-6">WebSphere</div>
-            <div class="grid grid-cols-1 gap-4 mt-2">
-                <div>
-                    <label class="block text-gray-700 dark:text-gray-300">Upload Mode enabled:</label>
-                    <Checkbox bind:checked={$newWasAppServerConfig.upload_mode_enabled} class="align-middle transform scale-100" disabled={viewingMode}/>
-                </div>
-                <div class="grid grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">WAS Cell:</label>
-                        <input bind:value={$newWasAppServerConfig.was_cell}
-                            type="text"
-                            class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">WAS Node:</label>
-                        <input bind:value={$newWasAppServerConfig.was_node}
-                            type="text"
-                            class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">WAS Cluster:</label>
-                        <input bind:value={$newWasAppServerConfig.was_cluster}
-                            type="text"
-                            class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode}
-                        />
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">WAS Name:</label>
-                        <input bind:value={$newWasAppServerConfig.was_name}
-                            type="text"
-                            class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 dark:text-gray-300">WebSphere Access Information:</label>
-                        <input
-                            bind:value={$newWasAppServerConfig.was_config_oid}
-                            class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                        />
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-gray-700 dark:text-gray-300">Targets:</label>
-                    <textarea bind:value={$newWasAppServerConfig.targets}
-                    class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode}></textarea>
-                </div>
-            </div>
-        {/if}
-        
-        {#if $newRemoteConnectionFeature.type === 'Tomcat'}
-            <div class="text-[#FFAA33] font-bold underline mt-6">Tomcat</div>
-            <div class="grid grid-cols-2 gap-4 mt-2">
-                <div class="col-span-1">
-                    <label class="text-gray-700 dark:text-gray-300">Server name: </label>
-                    <input bind:value={$newTomcatAppServerConfig.server_name}
-                        type="text"
-                        class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                    />
-                </div>
-                <div class="col-span-1">
-                    <label class="text-gray-700 dark:text-gray-300">Port:</label>
-                    <input bind:value={$newTomcatAppServerConfig.port}
-                        type="number" min="0"
-                        class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                    />
-                </div>
-                <div class="col-span-2">
-                    <label class="block text-gray-700 dark:text-gray-300">Tomcat binary location:</label>
-                    <input bind:value={$newTomcatAppServerConfig.binary_location}
-                        type="text"
-                        class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                    />
-                </div>
-                <div class="col-span-2">
-                    <label class="block text-gray-700 dark:text-gray-300">Portlets location:</label>
-                    <input bind:value={$newTomcatAppServerConfig.portlets_location}
-                        type="text"
-                        class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                    />
-                </div>
-            </div>
-        {/if}
-            {#if !viewingMode}
-            <button
-            class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"  on:click={() => toggleSSHPopover(false)}>
-                Submit
-            </button>
-            
-            {/if}
-        </div>
-    </div>
-    {/if}
-            </Popover.Root>
+          </Popover.Root>
 
              <!-- SSH Table -->
              <div class="overflow-x-auto mb-6">
@@ -2068,7 +2231,6 @@ async function testAllConnections() {
                     <thead class="bg-gray-400 dark:bg-gray-700 text-white">
                         <tr>
                             <th class="px-4 py-2 border border-gray-300 dark:border-gray-700">Test</th>
-                            <th class="px-4 py-2 border border-gray-300 dark:border-gray-700">ID</th>
                             <th class="px-4 py-2 border border-gray-300 dark:border-gray-700">Host</th>
                             <th class="px-4 py-2 border border-gray-300 dark:border-gray-700">Port</th>
                             <th class="px-4 py-2 border border-gray-300 dark:border-gray-700">Username</th>
@@ -2083,13 +2245,12 @@ async function testAllConnections() {
                                     on:click={() => testSshConnection(ssh, index)}
                                   >Test</button>
                                 </td>
-                                <td class="px-4 py-2 border border-gray-300 dark:border-gray-700">{ssh.con_oid}</td>
                                 <td class="px-4 py-2 border border-gray-300 dark:border-gray-700">{ssh.host}</td>
                                 <td class="px-4 py-2 border border-gray-300 dark:border-gray-700">{ssh.port}</td>
                                 <td class="px-4 py-2 border border-gray-300 dark:border-gray-700">{ssh.username}</td>
                                 <td class="px-4 py-2 border border-gray-300 dark:border-gray-700">
                                     <button type="button" on:click={() => viewSSHConnection(index)} class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-700">Display</button>
-                                    <button type="button" on:click={() => editSSHConnection(index)} class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-yellow-700">Edit</button>
+                                    <button type="button" on:click={() => openEditSSHConnectionModal(index)} class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-yellow-700">Edit</button>
                                     <button type="button" on:click={() => deleteSSHConnection(ssh.con_oid)} class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700">Delete</button>
                                 </td>
                             </tr>
@@ -2097,6 +2258,7 @@ async function testAllConnections() {
                     </tbody>
                 </table>
              </div>
+
              <button type="button" on:click={testAllConnections} class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 Test All Connections
               </button>

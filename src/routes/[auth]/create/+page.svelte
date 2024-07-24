@@ -1,6 +1,9 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import client from '$lib/apolloClient';
+    import * as Tabs from "$lib/components/ui/tabs";
+    import DeletePage from '../delete/+page.svelte';
+    import EditPage from '../edit/+page.svelte';
     import {
       newEnvironmentName,
       newHostType,
@@ -11,6 +14,7 @@
       selectedDuplicateEnvId,
       environments,
       errorMessage,
+      technicalMessage,
       selectedEnvironmentId,
       connectionDetails,
       sshConnection,
@@ -34,7 +38,10 @@
     import * as Popover from "$lib/components/ui/popover";
     import { Checkbox } from "$lib/components/ui/checkbox";
     import { Progress } from '$lib/components/ui/progress';
-    
+    import * as Accordion from "$lib/components/ui/accordion";
+
+    // import { toast } from "svelte-sonner";
+
     // import MyClass from './path/to/MyClass';
 
     // const myInstance = new MyClass();
@@ -50,9 +57,9 @@
     const sshValid = !!$connectionDetails.SSH.host && !!$connectionDetails.SSH.port && !!$connectionDetails.SSH.username && ($connectionDetails.SSH.authType === 'Password' ? !!$connectionDetails.SSH.password : (!!$connectionDetails.SSH.privateKey && !!$connectionDetails.SSH.publicKey));
     const sftpValid = !!$connectionDetails.SFTP.remoteDirectory;
     const bpmValid = !!$connectionDetails.BPM.username && !!$connectionDetails.BPM.language && !!$connectionDetails.BPM.password;
-    const hostValid = !!$connectionDetails.Host.host && !!$connectionDetails.Host.port && !!$connectionDetails.Host.user && !!$connectionDetails.Host.password;
-    const x3sValid = !!$connectionDetails.X3S.host && !!$connectionDetails.X3S.port && !!$connectionDetails.X3S.user && !!$connectionDetails.X3S.password;
-    const tlmValid = !!$connectionDetails.TLM.host && !!$connectionDetails.TLM.port && !!$connectionDetails.TLM.user && !!$connectionDetails.TLM.password;
+    const hostValid = !!$connectionDetails.Host.host && !!$connectionDetails.Host.port && !!$connectionDetails.Host.username && !!$connectionDetails.Host.password;
+    const x3sValid = !!$connectionDetails.X3S.host && !!$connectionDetails.X3S.port && !!$connectionDetails.X3S.username && !!$connectionDetails.X3S.password;
+    const tlmValid = !!$connectionDetails.TLM.host && !!$connectionDetails.TLM.port && !!$connectionDetails.TLM.username && !!$connectionDetails.TLM.password;
 
     canCreate.set(sshValid && sftpValid && bpmValid && hostValid && x3sValid && tlmValid);
   }
@@ -334,17 +341,18 @@ function getComponentsByInfraType(infraType: string, serverType: string): Compon
   return componentsMap[infraType] || [];
 }
 
-async function insertAllConnections() {
-  openProgressPopover();
-  testMessage.set('Starting connection creation...');
-  let progress = 0;
-  let success = true;
-  let envOid = get(selectedEnvironmentId);
-  let hostType = get(newHostType);
 
-  const updateProgress = () => {
-    progress += 10;
-  };
+  async function insertAllConnections() {
+    openProgressPopover();
+    testMessage.set('Starting connection creation...');
+    let progress = 0;
+    let success = true;
+    let envOid = get(selectedEnvironmentId);
+    let hostType = get(newHostType);
+
+    const updateProgress = () => {
+      progress += 10;
+    };
 
   const rollbackEnvironment = async () => {
     if (envOid) {
@@ -380,13 +388,68 @@ async function insertAllConnections() {
       envOid = result.data.insert_console_environment_one.env_oid;
       selectedEnvironmentId.set(envOid);
       environments.update(envs => [...envs, result.data.insert_console_environment_one]);
+      console.log('Created Environment OID:', envOid); 
+      if (!envOid) {
+        throw new Error('Environment OID is null after creation.');
+      }
       updateProgress();
-    } catch (error) {
+    } catch (error: string) {
       console.error('Error creating environment:', error);
       errorMessage.set('Error creating environment.');
+      technicalMessage.set(error.message || "Unknown technical error");
       success = false;
     }
   }
+
+  if (success) {
+    const sshDetails = get(connectionDetails).SSH;
+    try {
+      console.log("Sending SSH details: ", sshDetails);
+      const formattedSshDetails = {
+        auth_type: sshDetails.authType,
+        host: sshDetails.host,
+        port: sshDetails.port,
+        username: sshDetails.username,
+        password: sshDetails.password,
+        private_key: sshDetails.privateKey,
+        public_key: sshDetails.publicKey,
+        passphrase: sshDetails.passphrase
+      };
+
+      const sshResult = await client.mutate({
+        mutation: CREATE_SSH_CONNECTION,
+        variables: {
+          env_oid: envOid,
+          ...formattedSshDetails
+        }
+      });
+
+      console.log('SSH Connection Created:', sshResult);
+      updateProgress();
+
+      const sftpDetails = get(connectionDetails).SFTP;
+      if (sshResult.data && sshResult.data.insert_console_sshconnection_one.con_oid) {
+        const formattedSftpDetails = {
+          remote_directory: sftpDetails.remoteDirectory,
+          is_active: sftpDetails.isActive
+        }
+        const sftpResult = await client.mutate({
+          mutation: CREATE_SFTP_CONNECTION,
+          variables: {
+            env_oid: envOid,
+            ssh_con_oid: sshResult.data.insert_console_sshconnection_one.con_oid,
+            ...formattedSftpDetails
+          }
+        });
+        console.log('SFTP Connection Created:', sftpResult);
+        updateProgress();
+      }
+    } catch (error) {
+      console.error('Failed to create SSH/SFTP connection:', error);
+      success = false;
+    }
+  }
+
 
   if (success) {
     for (const type of ['Host', 'TLM', 'X3S'] as ConnectionType[]) {
@@ -416,25 +479,28 @@ async function insertAllConnections() {
     }
   }
 
-  if (success) {
-    try {
-      const bpmParams = get(connectionDetails).BPM;
-      const bpmResult = await client.mutate({
-        mutation: CREATE_SABBPM_CONNECTION,
-        variables: {
-          env_oid: envOid,
-          ...bpmParams
-        }
-      });
-      console.log('BPM Connection Created:', bpmResult);
-      updateProgress();
-    } catch (error) {
-      console.error('Failed to create BPM connection:', error);
-      success = false;
-    }
+  if (success) { 
+  console.log('Attempting to create BPM connection with envOid:', envOid);
+  try {
+    const bpmParams = get(connectionDetails).BPM;
+    console.log('BPM Params:', bpmParams);
+    const bpmResult = await client.mutate({
+      mutation: CREATE_SABBPM_CONNECTION,
+      variables: {
+        env_oid: envOid,
+        ...bpmParams
+      }
+    });
+    console.log('BPM Connection Created:', bpmResult);
+    updateProgress();
+  } catch (error) {
+    console.error('Failed to create BPM connection:', error);
+    success = false;
   }
+}
 
   // Initialize maps outside the if block
+ 
   type ConnectionIdMap = { [key: number]: number };
 
   const wasConnectionIdMap: ConnectionIdMap = {};
@@ -617,110 +683,64 @@ async function insertAllConnections() {
   }
 
   if (success) {
-    const sshDetails = get(connectionDetails).SSH;
     try {
-      console.log("Sending SSH details: ", sshDetails);
-      const formattedSshDetails = {
-        auth_type: sshDetails.authType,
-        host: sshDetails.host,
-        port: sshDetails.port,
-        username: sshDetails.username,
-        password: sshDetails.password,
-        private_key: sshDetails.privateKey,
-        public_key: sshDetails.publicKey,
-        passphrase: sshDetails.passphrase
-      };
-
-      const sshResult = await client.mutate({
-        mutation: CREATE_SSH_CONNECTION,
+      const instConfigResult = await client.mutate({
+        mutation: CREATE_INSTCONFIG,
         variables: {
           env_oid: envOid,
-          ...formattedSshDetails
+          install_type_default: "Automatic installation",
+          integration_thread_number: 1
         }
       });
 
-      console.log('SSH Connection Created:', sshResult);
-      updateProgress();
+      const instConfigOid = instConfigResult.data.insert_console_installationconfiguration_one.instconfig_oid;
 
-      const sftpDetails = get(connectionDetails).SFTP;
-      if (sshResult.data && sshResult.data.insert_console_sshconnection_one.con_oid) {
-        const formattedSftpDetails = {
-          remote_directory: sftpDetails.remoteDirectory,
-          is_active: sftpDetails.isActive
-        }
-        const sftpResult = await client.mutate({
-          mutation: CREATE_SFTP_CONNECTION,
+      const infraTypes = ["SDE", "Host", "FlowmindServer", "ConsoleLocale", "SabUnix", "WebServices", "X3", "X3S", "YourPortalBanker", "YourPortalCustomer"];
+      const defaultParams = {
+        thread_number: 1,
+        config_files_dir: "/dir"
+      };
+
+      for (const infraType of infraTypes) {
+        const appParamResult = await client.mutate({
+          mutation: CREATE_APPPARAM,
           variables: {
-            env_oid: envOid,
-            ssh_con_oid: sshResult.data.insert_console_sshconnection_one.con_oid,
-            ...formattedSftpDetails
+            instconfig_oid: instConfigOid,
+            infra_type: infraType,
+            ...defaultParams
           }
         });
-        console.log('SFTP Connection Created:', sftpResult);
-        updateProgress();
+        const appParamOid = appParamResult.data.insert_console_applicationparameter_one.appparam_oid;
+
+        const components = getComponentsByInfraType(infraType, hostType);
+        for (const component of components) {
+          await client.mutate({
+            mutation: CREATE_COMPONENT,
+            variables: {
+              appparam_oid: appParamOid,
+              type: component.type,
+              server_type: component.server_type,
+              value: component.value
+            }
+          });
+        }
       }
+      console.log('Installation configuration and parameters successfully created.');
+      updateProgress();
     } catch (error) {
-      console.error('Failed to create SSH/SFTP connection:', error);
+      console.error('Failed to create installation configuration or parameters:', error);
       success = false;
     }
   }
-
-  // if (success) {
-  //   try {
-  //     const instConfigResult = await client.mutate({
-  //       mutation: CREATE_INSTCONFIG,
-  //       variables: {
-  //         env_oid: envOid,
-  //         install_type_default: "Automatic installation",
-  //         integration_thread_number: 1
-  //       }
-  //     });
-
-  //     const instConfigOid = instConfigResult.data.insert_console_installationconfiguration_one.instconfig_oid;
-
-  //     const infraTypes = ["SDE", "Host", "FlowmindServer", "ConsoleLocale", "SabUnix", "WebServices", "X3", "X3S", "YourPortalBanker", "YourPortalCustomer"];
-  //     const defaultParams = {
-  //       thread_number: 1,
-  //       config_files_dir: "/dir"
-  //     };
-
-  //     for (const infraType of infraTypes) {
-  //       const appParamResult = await client.mutate({
-  //         mutation: CREATE_APPPARAM,
-  //         variables: {
-  //           instconfig_oid: instConfigOid,
-  //           infra_type: infraType,
-  //           ...defaultParams
-  //         }
-  //       });
-  //       const appParamOid = appParamResult.data.insert_console_applicationparameter_one.appparam_oid;
-
-  //       const components = getComponentsByInfraType(infraType, hostType);
-  //       for (const component of components) {
-  //         await client.mutate({
-  //           mutation: CREATE_COMPONENT,
-  //           variables: {
-  //             appparam_oid: appParamOid,
-  //             type: component.type,
-  //             server_type: component.server_type,
-  //             value: component.value
-  //           }
-  //         });
-  //       }
-  //     }
-  //     console.log('Installation configuration and parameters successfully created.');
-  //     updateProgress();
-  //   } catch (error) {
-  //     console.error('Failed to create installation configuration or parameters:', error);
-  //     success = false;
-  //   }
-  // }
 
   if (success) {
     testMessage.set('All connections have been successfully created.');
     testProgress.set(100);
     closeProgressPopover();
     console.log('All required connections have been successfully created.');
+
+    // toast.success("All connections have been successfully created.");
+
   } else {
     testMessage.set('Failed to create all connections.');
     await rollbackEnvironment();
@@ -1145,7 +1165,7 @@ function addOrUpdateWasConnections() {
             testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
         }
         testProgress.set(100);
-    } catch (error) {
+    } catch (error: string) {
         console.error('Failed test for connection', index, error);
         testMessage.set(`Failed test for connection ${index + 1}: ${error.message}`);
     }
@@ -1211,13 +1231,41 @@ async function testConnection(connection: any, index: number, connectionType: st
 
       if (responseData.success) {
         testMessage.set(`Connection ${index + 1} tested successfully!`);
+        if (connectionType === 'BDDHOST') {
+        connectionStatuses.update(statuses => ({ ...statuses, host: 'success' }));
+      } else if (connectionType === 'BDDX3S') {
+        connectionStatuses.update(statuses => ({ ...statuses, x3s: 'success' }));
+      } else if (connectionType === 'BDDTLM') {
+        connectionStatuses.update(statuses => ({ ...statuses, tlm: 'success' }));
+      } else if (connectionType === 'SSH') {
+        connectionStatuses.update(statuses => {
+          const newStatuses = [...statuses.ssh];
+          newStatuses[index] = 'success';
+          return { ...statuses, ssh: newStatuses };
+        });
+      }
       } else {
         const errorMessages = responseData.data.connections[0].testResult.feedbacks.join(', ') || 'Unknown error';
         testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
+        if (connectionType === 'BDDHOST') {
+        connectionStatuses.update(statuses => ({ ...statuses, host: 'failure' }));
+      } else if (connectionType === 'BDDX3S') {
+        connectionStatuses.update(statuses => ({ ...statuses, x3s: 'failure' }));
+      } else if (connectionType === 'BDDTLM') {
+        connectionStatuses.update(statuses => ({ ...statuses, tlm: 'failure' }));
+      } else if (connectionType === 'SSH') {
+        connectionStatuses.update(statuses => {
+          const newStatuses = [...statuses.ssh];
+          newStatuses[index] = 'failure';
+          return { ...statuses, ssh: newStatuses };
+        });
+      }
       }
       testProgress.set(100);
-    } catch (error) {
+    } catch (error: string) {
       console.error('Failed to test connection', index, error);
+      testMessage.set(`Failed to test connection ${index + 1}: ${error.message}`);
+      technicalMessage.set(error.message || 'Unknown technical error');
     }
   }
 
@@ -1302,7 +1350,7 @@ async function testConnection(connection: any, index: number, connectionType: st
       freeEntry: $connectionDetails.Host.freeEntry,
       host: $connectionDetails.Host.host,
       port: $connectionDetails.Host.port,
-      user: $connectionDetails.Host.user,
+      user: $connectionDetails.Host.username,
       password: $connectionDetails.Host.password,
       schema: $connectionDetails.Host.schema,
       sid: $connectionDetails.Host.sid,
@@ -1319,7 +1367,7 @@ async function testConnection(connection: any, index: number, connectionType: st
       freeEntry: $connectionDetails.TLM.freeEntry,
       host: $connectionDetails.TLM.host,
       port: $connectionDetails.TLM.port,
-      user: $connectionDetails.TLM.user,
+      user: $connectionDetails.TLM.username,
       password: $connectionDetails.TLM.password,
       schema: $connectionDetails.TLM.schema,
       sid: $connectionDetails.TLM.sid,
@@ -1336,7 +1384,7 @@ async function testConnection(connection: any, index: number, connectionType: st
       freeEntry: $connectionDetails.X3S.freeEntry,
       host: $connectionDetails.X3S.host,
       port: $connectionDetails.X3S.port,
-      user: $connectionDetails.X3S.user,
+      user: $connectionDetails.X3S.username,
       password: $connectionDetails.X3S.password,
       schema: $connectionDetails.X3S.schema,
       sid: $connectionDetails.X3S.sid,
@@ -1448,9 +1496,10 @@ async function testConnection(connection: any, index: number, connectionType: st
       connectionStatuses.set(updatedStatuses);
     }
       testProgress.set(100);
-    } catch (error) {
+    } catch (error: string) {
       console.error('Failed to test connections', error);
       testMessage.set('Failed to test connections. Please try again.');
+      technicalMessage.set(error.message || 'Unknown technical error');
     }
   }
 
@@ -1524,16 +1573,30 @@ async function testConnection(connection: any, index: number, connectionType: st
 
     if (responseData.success) {
       testMessage.set(`Mailbox connections tested successfully!`);
+         connectionStatuses.update(statuses => ({
+        ...statuses,
+        singleSsh: 'success',
+        sftp: 'success'
+      }));
     } else {
       const feedbacks = responseData.data.connections.map((conn: any, idx: number) =>
         `Connection ${idx + 1} (${conn.connection.connectionType}): ${conn.testResult.feedbacks.join(', ')}`
       ).join('\n');
       testMessage.set(`Test results:\n${feedbacks}`);
+      responseData.data.connections.forEach((conn: any, idx: number) => {
+        const status = conn.testResult.success ? 'success' : 'failure';
+        if (conn.connection.connectionType === 'SSH') {
+          connectionStatuses.update(statuses => ({ ...statuses, singleSsh: status }));
+        } else if (conn.connection.connectionType === 'SFTP') {
+          connectionStatuses.update(statuses => ({ ...statuses, sftp: status }));
+        }
+      });
     }
     testProgress.set(100);
-  } catch (error) {
+  } catch (error: string) {
     console.error('Failed to test mailbox connections', error);
     testMessage.set('Failed to test mailbox connections. Please try again.');
+    technicalMessage.set(error.message || 'Unknown technical error');
   } 
 }
 
@@ -1654,6 +1717,15 @@ let viewingMode = false;
 
 </script>
 
+
+  <Tabs.Root value="display" class="w-full ">
+    <Tabs.List class="grid w-full grid-cols-4 ">
+        <Tabs.Trigger value="create">Create</Tabs.Trigger>
+        <Tabs.Trigger value="edit">Edit</Tabs.Trigger>
+        <Tabs.Trigger value="delete">Delete</Tabs.Trigger>
+    </Tabs.List>
+    <Tabs.Content value="create">
+    
 {#if $showValidationResults}
 <div class="alert {$validationSuccess ? 'alert-success' : 'alert-danger'}">
     {$validationMessage}
@@ -1870,7 +1942,7 @@ let viewingMode = false;
                      <label class="text-gray-700 dark:text-gray-300 w-1/4">User:</label>
                      <input 
                        type="text" 
-                       bind:value={$connectionDetails.Host.user} 
+                       bind:value={$connectionDetails.Host.username} 
                        class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" 
                        required>
                    </div>
@@ -1981,7 +2053,7 @@ let viewingMode = false;
       <label class="text-gray-700 dark:text-gray-300 w-1/4">Username:</label>
       <input 
         type="text" 
-        bind:value={$connectionDetails.X3S.user} 
+        bind:value={$connectionDetails.X3S.username} 
         class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" 
         required>
     </div>
@@ -2091,7 +2163,7 @@ let viewingMode = false;
                         <label class="text-gray-700 dark:text-gray-300 w-1/4">Username:</label>
                         <input 
                           type="text" 
-                          bind:value={$connectionDetails.TLM.user} 
+                          bind:value={$connectionDetails.TLM.username} 
                           class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" 
                           required>
                       </div>
@@ -2584,7 +2656,16 @@ let viewingMode = false;
                         </button>
                         <h2 class="text-xl font-bold dark:text-gray-300 mb-4">Testing Connection...</h2>
                         <Progress max={100} value={$testProgress} />
-                        <div class="text-lg text-gray-800 pt-4 mt-4 dark:text-gray-300 whitespace-pre-line leading-relaxed">{$testMessage}</div>
+                        <div class="text-lg text-gray-800 pt-4 mt-4 dark:text-gray-300 whitespace-pre-line leading-relaxed">{$testMessage}
+                          <Accordion.Root>
+                            <Accordion.Item value="technical-details">
+                              <Accordion.Trigger>Logs</Accordion.Trigger>
+                              <Accordion.Content>
+                                <pre>{$technicalMessage}</pre>
+                              </Accordion.Content>
+                            </Accordion.Item>
+                          </Accordion.Root>
+                        </div>
                     </div>
                 </div>
             {/if}
@@ -2670,6 +2751,14 @@ let viewingMode = false;
                         {:else}
                         {#each $validationMessages as message}
                         <p>{message}</p>
+                        <Accordion.Root>
+                          <Accordion.Item value="technical-details">
+                            <Accordion.Trigger>Logs</Accordion.Trigger>
+                            <Accordion.Content>
+                              <pre>{technicalMessage}</pre>
+                            </Accordion.Content>
+                          </Accordion.Item>
+                        </Accordion.Root>
                       {/each}
                         {/if}
                     </div>
@@ -2697,3 +2786,11 @@ let viewingMode = false;
         </form>
     {/if}
   </div>
+    </Tabs.Content>
+    <Tabs.Content value="edit">
+      <EditPage />
+    </Tabs.Content>
+    <Tabs.Content value="delete">
+      <DeletePage />
+    </Tabs.Content>
+  </Tabs.Root>

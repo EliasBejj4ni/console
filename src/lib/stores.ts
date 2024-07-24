@@ -47,6 +47,7 @@ export const showInputs: Writable<boolean> = writable(false);
 export const selectedDuplicateEnvId: Writable<number | null> = writable(null);
 export const environments: Writable<Environment[]> = writable([]);
 export const errorMessage: Writable<string> = writable('');
+export const technicalMessage: Writable<string> = writable('');
 export const selectedInfo: Writable<SelectedInfo> = writable({
   env_oid: 0,
   env_name: '',
@@ -129,6 +130,7 @@ export const selectedEnvironmentId = writable<number | null>(null);
   export const newTomcatAppServerConfigs = writable<TomcatAppServerConfig[]>([]);
 
   export const probeSSHConnections = writable<SSHConnectionInfo[]>([]);
+  
   export const newProbeSSHConnection = writable<newSSHConnectionInfo>({
     con_oid: 0,
     authType: 'Password',
@@ -224,6 +226,8 @@ export const currentSshConnection = writable<SSHConnectionInfo>({
     keystorePassword: '',
   });
 
+  export const wasConnectionsList = writable<WebsphereConnectionInfo[]>([]);
+
   export interface ProbeApplications {
     BPM: boolean;
     SDE: boolean;
@@ -302,7 +306,7 @@ export const currentSshConnection = writable<SSHConnectionInfo>({
     host: string;
     freeEntry: boolean;
     port: string;
-    user: string;
+    username: string;
     password: string;
     url: string;
     schema: string;
@@ -362,7 +366,7 @@ export const tlmConnection: Writable<TlmConnectionInfo> = writable({
   host: '',
   freeEntry: false,
   port: '',
-  user: '',
+  username: '',
   password: '',
   url: '',
   schema: '',
@@ -378,7 +382,7 @@ export const x3sConnection: Writable<X3sConnectionInfo> = writable({
   host: '',
   freeEntry: false,
   port: '',
-  user: '',
+  username: '',
   password: '',
   url: '',
   schema: '',
@@ -403,7 +407,7 @@ export const hostConnection: Writable<HostConnectionInfo> = writable({
   host: '',
   freeEntry: false,
   port: '',
-  user: '',
+  username: '',
   password: '',
   url: '',
   schema: '',
@@ -474,6 +478,7 @@ export const hostConnection: Writable<HostConnectionInfo> = writable({
 
   export interface SSHConnectionInfo {
     con_oid: number;
+    env_oid?: number;
     authType: 'Password' | 'Identity';
     host: string;
     port: number;
@@ -512,7 +517,7 @@ export interface TlmConnectionInfo {
   host: string;
   freeEntry: boolean;
   port: string;
-  user: string;
+  username: string;
   password: string;
   url: string;
   schema: string;
@@ -528,7 +533,7 @@ export interface X3sConnectionInfo {
   host: string;
   freeEntry: boolean;
   port: string;
-  user: string;
+  username: string;
   password: string;
   url: string;
   schema: string;
@@ -551,7 +556,7 @@ export interface HostConnectionInfo {
   host: string;
   freeEntry: boolean;
   port: string;
-  user: string;
+  username: string;
   password: string;
   url: string;
   schema: string;
@@ -568,7 +573,7 @@ export const connectionDetails = writable<ConnectionParams>({
       host: '',
       freeEntry: false,
       port: '',
-      user: '',
+      username: '',
       password: '',
       url: '',
       schema: '',
@@ -582,7 +587,7 @@ export const connectionDetails = writable<ConnectionParams>({
       host: '',
       freeEntry: false,
       port: '',
-      user: '',
+      username: '',
       password: '',
       url: '',
       schema: '',
@@ -596,7 +601,7 @@ export const connectionDetails = writable<ConnectionParams>({
       host: '',
       freeEntry: false,
       port: '',
-      user: '',
+      username: '',
       password: '',
       url: '',
       schema: '',
