@@ -13,8 +13,6 @@
         <MenuItem {active} item="Administration ▼" >
           <div class="flex flex-col space-y-4 text-sm">
             <HoveredLink href="/auth/create">Create Environment</HoveredLink>
-            <HoveredLink href="/auth/edit">Modify Existing Environment</HoveredLink>
-            <HoveredLink href="/auth/delete">Delete Existing Environment</HoveredLink>
             <HoveredLink href="/auth/installation">Installation parameters</HoveredLink>
           </div>
         </MenuItem>

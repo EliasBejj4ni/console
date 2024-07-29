@@ -39,31 +39,14 @@
     import { Checkbox } from "$lib/components/ui/checkbox";
     import { Progress } from '$lib/components/ui/progress';
     import * as Accordion from "$lib/components/ui/accordion";
-
     // import { toast } from "svelte-sonner";
-
-    // import MyClass from './path/to/MyClass';
-
-    // const myInstance = new MyClass();
     
     let testingInProgress = writable(false);
     let testProgress = writable(0);
     let testMessage = writable('');
     let showProgressPopover = writable(false);
     
-
-    let canCreate = writable(false);
-    $: {
-    const sshValid = !!$connectionDetails.SSH.host && !!$connectionDetails.SSH.port && !!$connectionDetails.SSH.username && ($connectionDetails.SSH.authType === 'Password' ? !!$connectionDetails.SSH.password : (!!$connectionDetails.SSH.privateKey && !!$connectionDetails.SSH.publicKey));
-    const sftpValid = !!$connectionDetails.SFTP.remoteDirectory;
-    const bpmValid = !!$connectionDetails.BPM.username && !!$connectionDetails.BPM.language && !!$connectionDetails.BPM.password;
-    const hostValid = !!$connectionDetails.Host.host && !!$connectionDetails.Host.port && !!$connectionDetails.Host.username && !!$connectionDetails.Host.password;
-    const x3sValid = !!$connectionDetails.X3S.host && !!$connectionDetails.X3S.port && !!$connectionDetails.X3S.username && !!$connectionDetails.X3S.password;
-    const tlmValid = !!$connectionDetails.TLM.host && !!$connectionDetails.TLM.port && !!$connectionDetails.TLM.username && !!$connectionDetails.TLM.password;
-
-    canCreate.set(sshValid && sftpValid && bpmValid && hostValid && x3sValid && tlmValid);
-  }
-
+    
     function openProgressPopover() {
       showProgressPopover.set(true);
       testingInProgress.set(true);
@@ -188,6 +171,18 @@ onMount(async () => {
     console.error('Error loading environments:', error);
   }
 });
+
+ // Reactive statement to check if the environment name is unique
+ let isEnvNameUnique = writable(true);
+ $: {
+    const envName = $newEnvironmentName.trim().toLowerCase();
+    isEnvNameUnique.set(!$environments.some(env => env.env_name.toLowerCase() === envName));
+    if (!isEnvNameUnique) {
+      errorMessage.set('Environment name already exists. Please choose a different name.');
+    } else {
+      errorMessage.set('');
+    }
+  }
   
 // set the visibility of inputs
 export const prepareInputs = () => {
@@ -343,6 +338,7 @@ function getComponentsByInfraType(infraType: string, serverType: string): Compon
 
 
   async function insertAllConnections() {
+    insertInProgress.set(true);
     openProgressPopover();
     testMessage.set('Starting connection creation...');
     let progress = 0;
@@ -736,6 +732,7 @@ function getComponentsByInfraType(infraType: string, serverType: string): Compon
   if (success) {
     testMessage.set('All connections have been successfully created.');
     testProgress.set(100);
+    insertInProgress.set(false);
     closeProgressPopover();
     console.log('All required connections have been successfully created.');
 
@@ -744,6 +741,7 @@ function getComponentsByInfraType(infraType: string, serverType: string): Compon
   } else {
     testMessage.set('Failed to create all connections.');
     await rollbackEnvironment();
+    insertInProgress.set(false);
     closeProgressPopover();
   }
 }
@@ -868,7 +866,7 @@ function addOrUpdateSshConnections() {
     });
   }
 
-  errorMessage.set(''); // Clear any previous error messages
+  errorMessage.set(''); 
   toggleSshspherePopover();
 }
 
@@ -1162,7 +1160,8 @@ function addOrUpdateWasConnections() {
             testMessage.set(`Connection ${index + 1} tested successfully!`);
         } else {
             const errorMessages = responseData.data.connections[0].testResult.feedbacks.join(', ') || 'Unknown error';
-            testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
+            testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);//to change to user friendly message
+            technicalMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
         }
         testProgress.set(100);
     } catch (error: string) {
@@ -1173,7 +1172,7 @@ function addOrUpdateWasConnections() {
 
 
 // Function to test a specific connection
-async function testConnection(connection: any, index: number, connectionType: string) {
+async function testConnection1(connection: any, index: number, connectionType: string) {
     openProgressPopover();
     testMessage.set(`Starting test for connection ${index + 1}...`);
 
@@ -1269,79 +1268,236 @@ async function testConnection(connection: any, index: number, connectionType: st
     }
   }
 
- // Function to test all connections
- async function testAllConnections() {
-    openProgressPopover();
-    testMessage.set(`Starting test for all connections...`);
+  async function testConnection(connection: any, index: number, connectionType: string) {
+  openProgressPopover();
+  testMessage.set(`Starting test for connection ${index + 1}...`);
 
-    const testUrl = 'http://localhost:8085/console/env-management/v1/test-connections';
-    
-    const sshConnectionsDetails = get(sshConnections).map((connection, index) => ({
-      action: "test",
-      connection: {
-        connectionType: "SSH",
-        authType: connection.authType,
-        host: connection.host,
-        port: connection.port,
-        user: connection.username,
-        password: connection.password,
-        privateKey: connection.privateKey,
-        publicKey: connection.publicKey,
-        passphrase: connection.passphrase
-      }
-    }));
+  // Reset the specific connection status to initial state
+  connectionStatuses.update(statuses => {
+    if (connectionType === 'BDDHOST') {
+      return { ...statuses, host: 'success' };
+    } else if (connectionType === 'BDDX3S') {
+      return { ...statuses, x3s: 'success' };
+    } else if (connectionType === 'BDDTLM') {
+      return { ...statuses, tlm: 'success' };
+    } else if (connectionType === 'SSH') {
+      const newStatuses = [...statuses.ssh];
+      newStatuses[index] = 'success';
+      return { ...statuses, ssh: newStatuses };
+    }
+    return statuses;
+  });
+    // Reset connectionStatuses to initial state
+    connectionStatuses.set({
+    ssh: [],
+    was: [],
+    host: 'success',
+    tlm: 'success',
+    x3s: 'success',
+    singleSsh: 'success',
+    sftp: 'success'
+  });
 
-    const wasConnectionsDetails = get(wasConnections).map((connection, index) => ({
-      action: "test",
-      connection: {
-        connectionType: "WAS",
-        host: connection.host,
-        port: connection.port,
-        securityEnabled: connection.securityEnabled,
-        username: connection.username,
-        password: connection.password,
-        sslConfigURL: connection.sslConfigUrl,
-        soapConfigURL: connection.soapConfigUrl,
-        sasConfigURL: connection.sasConfigUrl,
-        trustStore: connection.truststore,
-        trustStorePassword: connection.truststorePassword,
-        keyStore: connection.keystore,
-        keyStorePassword: connection.keystorePassword
-      }
-    }));
+  testMessage.set('');
+  technicalMessage.set('');
 
-    // Add other connections here (BDDHOST, X3S, TLM, etc.)
-    const sshConnection = {
-      action: "test",
-      connection: {
-        connectionType: "SSH",
-        authType: $connectionDetails.SSH.authType,
-        host: $connectionDetails.SSH.host,
-        port: $connectionDetails.SSH.port,
-        user: $connectionDetails.SSH.username,
-        password: $connectionDetails.SSH.password,
-        privateKey: $connectionDetails.SSH.privateKey,
-        publicKey: $connectionDetails.SSH.publicKey,
-        passphrase: $connectionDetails.SSH.passphrase
+  const testUrl = 'http://localhost:8085/console/env-management/v1/test-connections';
+  const requestBody = {
+    envName: $newEnvironmentName,
+    hostType: $newHostType,
+    encryptionType: $encryptionType,
+    communicationType: 'SSH',
+    connections: [
+      {
+        action: "test",
+        connection: {
+          connectionType: connectionType,
+          type: connection.type,
+          authType: connection.authType,
+          host: connection.host,
+          port: connection.port,
+          user: connection.user,
+          password: connection.password,
+          privateKey: connection.privateKey,
+          publicKey: connection.publicKey,
+          passphrase: connection.passphrase,
+          schema: connection.schema,
+          sid: connection.sid,
+          freeEntry: connection.freeEntry,
+        }
       }
-    };
-    const sftpConnection = {
-      action: "test",
-      connection: {
-        connectionType: "SFTP",
-        authType: $connectionDetails.SSH.authType,
-        host: $connectionDetails.SSH.host,
-        port: $connectionDetails.SSH.port,
-        user: $connectionDetails.SSH.username,
-        password: $connectionDetails.SSH.password,
-        privateKey: $connectionDetails.SSH.privateKey,
-        publicKey: $connectionDetails.SSH.publicKey,
-        passphrase: $connectionDetails.SSH.passphrase,
-        remoteDirectory: $connectionDetails.SFTP.remoteDirectory,
-        isActive: $connectionDetails.SFTP.isActive
+    ]
+  };
+  console.log("Request body being sent:", JSON.stringify(requestBody, null, 2));
+
+  try {
+    const response = await fetch(testUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    // Update the progress bar incrementally
+    let timer = setInterval(() => {
+      testProgress.update(n => {
+        if (n < 100) return n + 10; // Increment by 10%
+        clearInterval(timer);
+        return 100;
+      });
+    }, 1000); // Adjust interval speed as needed
+
+    if (response.status === 400) {
+      throw new Error('Bad request');
+    }
+
+    const responseData = await response.json();
+    clearInterval(timer);
+
+    if (responseData.success) {
+      testMessage.set(`Connection ${index + 1} tested successfully!`);
+      if (connectionType === 'BDDHOST') {
+        connectionStatuses.update(statuses => ({ ...statuses, host: 'success' }));
+      } else if (connectionType === 'BDDX3S') {
+        connectionStatuses.update(statuses => ({ ...statuses, x3s: 'success' }));
+      } else if (connectionType === 'BDDTLM') {
+        connectionStatuses.update(statuses => ({ ...statuses, tlm: 'success' }));
+      } else if (connectionType === 'SSH') {
+        connectionStatuses.update(statuses => {
+          const newStatuses = [...statuses.ssh];
+          newStatuses[index] = 'success';
+          return { ...statuses, ssh: newStatuses };
+        });
+      }
+    } else {
+      const errorMessages = responseData.data.connections[0].testResult.feedbacks.join(', ') || 'Unknown error';
+      testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
+      if (connectionType === 'BDDHOST') {
+        connectionStatuses.update(statuses => ({ ...statuses, host: 'failure' }));
+      } else if (connectionType === 'BDDX3S') {
+        connectionStatuses.update(statuses => ({ ...statuses, x3s: 'failure' }));
+      } else if (connectionType === 'BDDTLM') {
+        connectionStatuses.update(statuses => ({ ...statuses, tlm: 'failure' }));
+      } else if (connectionType === 'SSH') {
+        connectionStatuses.update(statuses => {
+          const newStatuses = [...statuses.ssh];
+          newStatuses[index] = 'failure';
+          return { ...statuses, ssh: newStatuses };
+        });
       }
     }
-    
+    testProgress.set(100);
+  } catch (error: string) {
+    console.error('Failed to test connection', index, error);
+    testMessage.set(`Failed to test connection ${index + 1}: ${error.message}`);
+    technicalMessage.set(error.message || 'Unknown technical error');
+    testProgress.set(100);
+    // Update the connectionStatuses store to 'failure' for the tested connection
+    connectionStatuses.update(statuses => {
+      if (connectionType === 'BDDHOST') {
+        return { ...statuses, host: 'failure' };
+      } else if (connectionType === 'BDDX3S') {
+        return { ...statuses, x3s: 'failure' };
+      } else if (connectionType === 'BDDTLM') {
+        return { ...statuses, tlm: 'failure' };
+      } else if (connectionType === 'SSH') {
+        const newStatuses = [...statuses.ssh];
+        newStatuses[index] = 'failure';
+        return { ...statuses, ssh: newStatuses };
+      }
+      return statuses;
+    });
+  }
+}
+
+ // Function to test all connections
+  async function testAllConnections() {
+  openProgressPopover();
+
+    // Reset connectionStatuses to initial state
+    connectionStatuses.set({
+    ssh: [],
+    was: [],
+    host: 'success',
+    tlm: 'success',
+    x3s: 'success',
+    singleSsh: 'success',
+    sftp: 'success'
+  });
+  testMessage.set('');
+  technicalMessage.set('');
+ 
+  const testUrl = 'http://localhost:8085/console/env-management/v1/test-connections';
+  
+  const sshConnectionsDetails = get(sshConnections).map((connection, index) => ({
+    action: "test",
+    connection: {
+      connectionType: "SSH",
+      authType: connection.authType,
+      host: connection.host,
+      port: connection.port,
+      user: connection.username,
+      password: connection.password,
+      privateKey: connection.privateKey,
+      publicKey: connection.publicKey,
+      passphrase: connection.passphrase
+    }
+  }));
+
+  const wasConnectionsDetails = get(wasConnections).map((connection, index) => ({
+    action: "test",
+    connection: {
+      connectionType: "WAS",
+      host: connection.host,
+      port: connection.port,
+      securityEnabled: connection.securityEnabled,
+      username: connection.username,
+      password: connection.password,
+      sslConfigURL: connection.sslConfigUrl,
+      soapConfigURL: connection.soapConfigUrl,
+      sasConfigURL: connection.sasConfigUrl,
+      trustStore: connection.truststore,
+      trustStorePassword: connection.truststorePassword,
+      keyStore: connection.keystore,
+      keyStorePassword: connection.keystorePassword
+    }
+  }));
+
+  // Add other connections here (BDDHOST, X3S, TLM, etc.)
+  const sshConnection = {
+    action: "test",
+    connection: {
+      connectionType: "SSH",
+      authType: $connectionDetails.SSH.authType,
+      host: $connectionDetails.SSH.host,
+      port: $connectionDetails.SSH.port,
+      user: $connectionDetails.SSH.username,
+      password: $connectionDetails.SSH.password,
+      privateKey: $connectionDetails.SSH.privateKey,
+      publicKey: $connectionDetails.SSH.publicKey,
+      passphrase: $connectionDetails.SSH.passphrase
+    }
+  };
+  const sftpConnection = {
+    action: "test",
+    connection: {
+      connectionType: "SFTP",
+      authType: $connectionDetails.SSH.authType,
+      host: $connectionDetails.SSH.host,
+      port: $connectionDetails.SSH.port,
+      user: $connectionDetails.SSH.username,
+      password: $connectionDetails.SSH.password,
+      privateKey: $connectionDetails.SSH.privateKey,
+      publicKey: $connectionDetails.SSH.publicKey,
+      passphrase: $connectionDetails.SSH.passphrase,
+      remoteDirectory: $connectionDetails.SFTP.remoteDirectory,
+      isActive: $connectionDetails.SFTP.isActive
+    }
+  }
+  
   const hostConnection = {
     action: "test",
     connection: {
@@ -1393,47 +1549,51 @@ async function testConnection(connection: any, index: number, connectionType: st
     }
   };
 
-    const requestBody = {
-      envName: $newEnvironmentName,
-      hostType: $newHostType,
-      encryptionType: "no encryption",
-      communicationType: "SSH",
-      sshConnections : [
-     ...sshConnectionsDetails
+  const requestBody = {
+    envName: $newEnvironmentName,
+    hostType: $newHostType,
+    encryptionType: "no encryption",
+    communicationType: "SSH",
+    sshConnections: [
+      ...sshConnectionsDetails
     ],
-      connections: [
-        ...wasConnectionsDetails,
-        hostConnection,
-        tlmConnection,
-        x3sConnection,
-        sshConnection,
-        sftpConnection
-      ]
-    };
+    connections: [
+      ...wasConnectionsDetails,
+      hostConnection,
+      tlmConnection,
+      x3sConnection,
+      sshConnection,
+      sftpConnection
+    ]
+  };
 
-    try {
-      const response = await fetch(testUrl, {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-        body: JSON.stringify(requestBody)
+  try {
+    const response = await fetch(testUrl, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    let timer = setInterval(() => {
+      testProgress.update(n => {
+        if (n < 100) return n + 10;
+        clearInterval(timer);
+        return 100;
       });
+    }, 100);
 
-      let timer = setInterval(() => {
-        testProgress.update(n => {
-          if (n < 100) return n + 10;
-          clearInterval(timer);
-          return 100;
-        });
-      }, 100);
+    if (response.status === 400) {
+      throw new Error('Bad request');
+    }
 
-      const responseData = await response.json();
-      clearInterval(timer);
+    const responseData = await response.json();
+    clearInterval(timer);
 
-      if (responseData.success) {
+    if (responseData.success) {
       testMessage.set(`All connections tested successfully!`);
       connectionStatuses.set({
         ssh: sshConnectionsDetails.map(() => 'success'),
@@ -1495,19 +1655,44 @@ async function testConnection(connection: any, index: number, connectionType: st
 
       connectionStatuses.set(updatedStatuses);
     }
-      testProgress.set(100);
-    } catch (error: string) {
-      console.error('Failed to test connections', error);
-      testMessage.set('Failed to test connections. Please try again.');
-      technicalMessage.set(error.message || 'Unknown technical error');
-    }
+    testProgress.set(100);
+  } catch (error: string) {
+    console.error('Failed to test connections', error);
+    testMessage.set('Failed to test connections. Please try again.');
+    technicalMessage.set(error.message || 'Unknown technical error');
+    testProgress.set(100);
+    // Update the connectionStatuses store to 'failure' for all connections
+    connectionStatuses.set({
+      ssh: sshConnectionsDetails.map(() => 'failure'),
+      was: wasConnectionsDetails.map(() => 'failure'),
+      host: 'failure',
+      tlm: 'failure',
+      x3s: 'failure',
+      singleSsh: 'failure',
+      sftp: 'failure'
+    });
   }
+}
 
-  //  Function to test MailBox connections
-  async function testMailboxConnections() {
+// Function to test MailBox connections
+async function testMailboxConnections() {
   openProgressPopover();
   testMessage.set(`Starting test for mailbox connections...`);
 
+  // Reset connectionStatuses to initial state
+  connectionStatuses.set({
+    ssh: [],
+    was: [],
+    host: 'success',
+    tlm: 'success',
+    x3s: 'success',
+    singleSsh: 'success',
+    sftp: 'success'
+  });
+
+  testMessage.set('');
+  technicalMessage.set('');
+ 
   const testUrl = 'http://localhost:8085/console/env-management/v1/test-connections';
   const requestBody = {
     envName: $newEnvironmentName,
@@ -1533,7 +1718,7 @@ async function testConnection(connection: any, index: number, connectionType: st
         action: "test",
         connection: {
           connectionType: "SFTP",
-          authType: $connectionDetails.SSH.authType, // Assuming same authType as SSH
+          authType: $connectionDetails.SSH.authType,
           host: $connectionDetails.SSH.host,
           port: $connectionDetails.SSH.port,
           user: $connectionDetails.SSH.username,
@@ -1568,12 +1753,16 @@ async function testConnection(connection: any, index: number, connectionType: st
       });
     }, 100);
 
+    if (response.status === 400) {
+      throw new Error('Bad request');
+    }
+
     const responseData = await response.json();
     clearInterval(timer);
 
     if (responseData.success) {
       testMessage.set(`Mailbox connections tested successfully!`);
-         connectionStatuses.update(statuses => ({
+      connectionStatuses.update(statuses => ({
         ...statuses,
         singleSsh: 'success',
         sftp: 'success'
@@ -1582,7 +1771,8 @@ async function testConnection(connection: any, index: number, connectionType: st
       const feedbacks = responseData.data.connections.map((conn: any, idx: number) =>
         `Connection ${idx + 1} (${conn.connection.connectionType}): ${conn.testResult.feedbacks.join(', ')}`
       ).join('\n');
-      testMessage.set(`Test results:\n${feedbacks}`);
+      testMessage.set(`Test results:\n${feedbacks}`);//to change to user friendly message
+      technicalMessage.set(feedbacks)
       responseData.data.connections.forEach((conn: any, idx: number) => {
         const status = conn.testResult.success ? 'success' : 'failure';
         if (conn.connection.connectionType === 'SSH') {
@@ -1597,8 +1787,16 @@ async function testConnection(connection: any, index: number, connectionType: st
     console.error('Failed to test mailbox connections', error);
     testMessage.set('Failed to test mailbox connections. Please try again.');
     technicalMessage.set(error.message || 'Unknown technical error');
-  } 
+    testProgress.set(100);
+
+    connectionStatuses.update(statuses => ({
+      ...statuses,
+      singleSsh: 'failure',
+      sftp: 'failure'
+    }));
+  }
 }
+
 
     
   let validateInProgress = writable(false);
@@ -1606,7 +1804,8 @@ async function testConnection(connection: any, index: number, connectionType: st
   let validationMessage = writable('');
   let validationMessages = writable<string[]>([]);
   let showValidationResults = writable(false);
-  let validationSuccess = writable(true); 
+  let validationSuccess = writable(false); 
+  let insertInProgress = writable(false);
 
   function startValidation() {
         validateInProgress.set(true);
@@ -1718,7 +1917,7 @@ let viewingMode = false;
 </script>
 
 
-  <Tabs.Root value="display" class="w-full ">
+  <Tabs.Root value="create" class="w-full ">
     <Tabs.List class="grid w-full grid-cols-4 ">
         <Tabs.Trigger value="create">Create</Tabs.Trigger>
         <Tabs.Trigger value="edit">Edit</Tabs.Trigger>
@@ -1733,65 +1932,66 @@ let viewingMode = false;
 {/if}
   <div class="p-4 bg-white dark:bg-gray-800">
     <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Create or Duplicate Environment</h2>
-    {#if !$showInputs}
-    <form on:submit|preventDefault={$selectedDuplicateEnvId ? duplicateEnvironment : prepareInputs}>
-      <div class="mt-4">
-        <label for="new-environment-name" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Environment Name:</label>
-        <input id="new-environment-name" type="text" bind:value={$newEnvironmentName} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" placeholder="Enter Environment Name" required>
-      </div>
-      <div class="mt-4">
-        <label for="new-host-type" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Host Type:</label>
-        <select id="new-host-type" bind:value={$newHostType} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" required>
-          <option value="" disabled selected>Enter Host Type</option>
-          <option value="IBMI">IBMI</option>
-          <option value="LINUX">LINUX</option>
-        </select>
-      </div>
-      <div class="mt-4">
-        <label for="encryption-type" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Encryption Type:</label>
-        <select id="encryption-type" bind:value={$encryptionType} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" required>
-          <option value="" disabled selected>Select Encryption Type</option>
-          <option value="no encryption">No Encryption</option>
-          <option value="encrypted">Encrypted</option>
-          <option value="AES-256">AES-256</option>
-        </select>
-      </div>
-      <div class="mt-4">
-        <label for="communication-type" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Communication Type:</label>
-        <select id="communication-type" bind:value={$communicationType} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" required>
-          <option value="" disabled selected>Select Communication Type</option>
-          <option value="SSH/FTP/FTPS">SSH/SFTP</option>
-        </select>
-      </div>
-      <div class="mt-4">
-        <label for="manage-configuration" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Manage the configuration from this console:</label>
-        <input id="manage-configuration" type="checkbox" bind:checked={$configurator} class="form-checkbox h-4 w-4 text-indigo-600 transition duration-150 ease-in-out" />
-      </div>
-      <div class="mt-4">
-        <label for="environment-selector" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Select Environment to Duplicate (optional):</label>
-        <select id="environment-selector" on:change={selectEnvironment} bind:value={$selectedDuplicateEnvId} class="px-3 py-0 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">
-          <option value={null}>-- Select an Environment --</option>
-          {#each $environments as environment (environment.env_oid)}
-            <option value={environment.env_oid}>{environment.env_name}</option>
-          {/each}
-        </select>
-      </div>
-      {#if $errorMessage}
-        <p class="text-red-500 dark:text-red-400 mt-2">{$errorMessage}</p>
-      {/if}
-      {#if $selectedDuplicateEnvId}
-        <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-          Duplicate
-        </button>
-      {:else}
-      {#if !$showInputs}
-        <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-          Next
-        </button>
-        {/if}
-      {/if}
-    </form>
+   {#if !$showInputs}
+  <form on:submit|preventDefault={$selectedDuplicateEnvId ? duplicateEnvironment : prepareInputs}>
+    <div class="mt-4">
+      <label for="new-environment-name" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Environment Name:</label>
+      <input id="new-environment-name" type="text" bind:value={$newEnvironmentName} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" placeholder="Enter Environment Name" required>
+      {#if !$isEnvNameUnique}
+      <p class="text-red-500 dark:text-red-400 mt-2">Environment name already exists. Please choose a different name.</p>
     {/if}
+    </div>
+    <div class="mt-4">
+      <label for="new-host-type" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Host Type:</label>
+      <select id="new-host-type" bind:value={$newHostType} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" required>
+        <option value="" disabled selected>Enter Host Type</option>
+        <option value="IBMI">IBMI</option>
+        <option value="LINUX">LINUX</option>
+      </select>
+    </div>
+    <div class="mt-4">
+      <label for="encryption-type" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Encryption Type:</label>
+      <select id="encryption-type" bind:value={$encryptionType} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" required>
+        <option value="" disabled selected>Select Encryption Type</option>
+        <option value="no encryption">No Encryption</option>
+        <option value="encrypted">Encrypted</option>
+        <option value="AES-256">AES-256</option>
+      </select>
+    </div>
+    <div class="mt-4">
+      <label for="communication-type" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Communication Type:</label>
+      <select id="communication-type" bind:value={$communicationType} class="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-300" required>
+        <option value="" disabled selected>Select Communication Type</option>
+        <option value="SSH/FTP/FTPS">SSH/SFTP</option>
+      </select>
+    </div>
+    <div class="mt-4">
+      <label for="manage-configuration" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Manage the configuration from this console:</label>
+      <input id="manage-configuration" type="checkbox" bind:checked={$configurator} class="form-checkbox h-4 w-4 text-indigo-600 transition duration-150 ease-in-out" />
+    </div>
+    <div class="mt-4">
+      <label for="environment-selector" class="text-sm font-medium text-gray-700 block mb-2 dark:text-gray-300">Select Environment to Duplicate (optional):</label>
+      <select id="environment-selector" on:change={selectEnvironment} bind:value={$selectedDuplicateEnvId} class="px-3 py-0 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">
+        <option value={null}>-- Select an Environment --</option>
+        {#each $environments as environment (environment.env_oid)}
+          <option value={environment.env_oid}>{environment.env_name}</option>
+        {/each}
+      </select>
+    </div>
+    {#if $errorMessage}
+      <p class="text-red-500 dark:text-red-400 mt-2">{$errorMessage}</p>
+    {/if}
+    {#if $selectedDuplicateEnvId}
+      <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" disabled={!$isEnvNameUnique}>
+        Duplicate
+      </button>
+    {:else}
+      <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" disabled={!$isEnvNameUnique}>
+        Next
+      </button>
+    {/if}
+  </form>
+{/if}
     
     {#if $showInputs}
         <form>
@@ -1851,6 +2051,7 @@ let viewingMode = false;
               </div>
             </div>
           </div>
+          
           <div class="space-y-1 py-4">
             <h1 class="text-xl font-bold text-[#FFAA33]">SAB BPM</h1>
             <p class="font-bold mt-2">These settings are only useful if SAB BPM is version 7.5.10 or higher.</p>
@@ -1979,7 +2180,9 @@ let viewingMode = false;
                        bind:checked={$connectionDetails.Host.secured} 
                        class="align-middle transform scale-100">
                    </div>
+
                   </div>
+
                   </div>
                 
                   <!-- X3S Database Connection Inputs -->
@@ -2266,7 +2469,7 @@ let viewingMode = false;
                           </div>
                           <div class="col-span-1">
                             <label class="text-gray-700 dark:text-gray-300">WAS SOAP Port :</label>
-                            <input type="number" bind:value={$newWasConnections.port} class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode} required/>
+                            <input type="number" min="0" bind:value={$newWasConnections.port} class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode} required/>
                           </div>
                           <div class="col-span-1">
                             <label class="text-gray-700 dark:text-gray-300">WAS Password :</label>
@@ -2768,21 +2971,21 @@ let viewingMode = false;
             <button type="button" on:click={testAllConnections} class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
               Test All Connections
             </button>
-              <div class="mt-4">
-                <button
+            <div class="mt-4 relative group">
+              <button
                 type="submit"
                 disabled={!$validationSuccess}
                 on:click={insertAllConnections}
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
-                {$validationSuccess ? 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer' : 'bg-indigo-300 cursor-not-allowed'}">
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2
+                {$validationSuccess ? 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500 cursor-pointer' : 'bg-gray-600 cursor-not-allowed'}">
                 Create
               </button>
-
-              <!-- <button type="submit" on:click={insertAllConnections}
-              class="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-              Create
-            </button> -->
-              </div>
+              {#if !$validationSuccess}
+                <div class="absolute bottom-full mb-2 hidden group-hover:block w-48 p-2 text-xs text-white bg-gray-700 rounded-md shadow-lg">
+                  Test all connections first.
+                </div>
+              {/if}
+            </div>
         </form>
     {/if}
   </div>

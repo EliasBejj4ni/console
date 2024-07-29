@@ -31,6 +31,7 @@
         tomcatAppServerConfigs,
         wasAppServerConfigs,
         newlyAddedProbeSSHConnections,
+        connectionStatuses,
 		    type WebsphereConnectionInfo,
         type WebsphereAppServerConfig,
         type TomcatAppServerConfig,
@@ -38,11 +39,12 @@
 
     } from '$lib/stores';
     import { GET_ENV, GET_ENV_DETAILS } from '$lib/queries';
-    import { UPDATE_ENVIRONMENT,UPDATE_SFTP_CONNECTION, UPDATE_SSH_CONNECTION, UPDATE_BPM_CONNECTION, UPDATE_DATABASE_CONNECTION, UPDATE_WAS_CONNECTION, UPDATE_REMOTE_CONNECTION_FEATURE, UPDATE_WAS_APP_SERVER_CONFIG, UPDATE_TOMCAT_APP_SERVER_CONFIG, DELETE_SSH_CONNECTION, DELETE_WAS_CONNECTION, CREATE_WAS_CONNECTION } from '$lib/mutation';
+    import { UPDATE_ENVIRONMENT,UPDATE_SFTP_CONNECTION, UPDATE_SSH_CONNECTION, UPDATE_BPM_CONNECTION, UPDATE_DATABASE_CONNECTION, UPDATE_WAS_CONNECTION, UPDATE_REMOTE_CONNECTION_FEATURE, UPDATE_WAS_APP_SERVER_CONFIG, UPDATE_TOMCAT_APP_SERVER_CONFIG, DELETE_SSH_CONNECTION, DELETE_WAS_CONNECTION, CREATE_WAS_CONNECTION, CREATE_SSH_CONNECTION, CREATE_REMOTE_CONNECTION_FEATURE, CREATE_WAS_APP_SERVER_CONFIG, CREATE_TOMCAT_APP_SERVER_CONFIG } from '$lib/mutation';
     import * as Popover from "$lib/components/ui/popover";
     import { Checkbox } from "$lib/components/ui/checkbox";
     import { Progress } from '$lib/components/ui/progress';
-	import type { SSHConnection } from '$lib/interfaces';
+	  import type { SSHConnection } from '$lib/interfaces';
+    import * as Accordion from "$lib/components/ui/accordion";
 
     function handleApplicationChange(application: any) {
     newRemoteConnectionFeature.update(current => ({ ...current, probe_application: application }));
@@ -65,9 +67,9 @@
             alert('Error deleting SSH connection');
         }
     }
-}
+  }
 
-async function deleteWASConnection(con_oid: number) {
+  async function deleteWASConnection(con_oid: number) {
     if (confirm('Are you sure you want to delete this WAS connection?')) {
         try {
             await client.mutate({
@@ -83,7 +85,7 @@ async function deleteWASConnection(con_oid: number) {
             alert('Error deleting WAS connection');
         }
     }
-}
+  }
 
 
     let showProgressPopover = false;
@@ -311,7 +313,7 @@ async function deleteWASConnection(con_oid: number) {
     }
 
 
-    function openEditSSHConnectionModal(index: number) {
+    function openEditSSHConnectionModal1(index: number) {
     const connectionToEdit = get(probeSSHConnections)[index];
     newSshConnections.set({ ...connectionToEdit });
     // Find the feature that matches the ssh_con_oid of the connection to edit
@@ -367,8 +369,60 @@ async function deleteWASConnection(con_oid: number) {
     toggleSSHPopover(true);
     }
 
+    function openEditSSHConnectionModal(index: number) {
+    const connectionToEdit = get(probeSSHConnections)[index];
+    newSshConnections.set({ ...connectionToEdit });
+    const features = get(remoteConnectionFeatures).filter((feature) => feature.ssh_con_oid === connectionToEdit.con_oid);
 
+    if (features.length > 0) {
+        const featureToEdit = features[0];
+        newRemoteConnectionFeature.set(featureToEdit);
+        if (featureToEdit.type === 'Websphere' && featureToEdit.wasappserverconfigs && featureToEdit.wasappserverconfigs.length > 0) {
+            newWasAppServerConfig.set(featureToEdit.wasappserverconfigs[0]);
+        } else if (featureToEdit.type === 'Tomcat' && featureToEdit.tomcatappserverconfigs && featureToEdit.tomcatappserverconfigs.length > 0) {
+            newTomcatAppServerConfig.set(featureToEdit.tomcatappserverconfigs[0]);
+        }
 
+    } else {
+        newRemoteConnectionFeature.set({
+            ssh_con_oid: connectionToEdit.con_oid,
+            was_con_oid: 0,
+            propagation: false,
+            installation: false,
+            dmgr: false,
+            instance_name: '',
+            type: '',
+            app_server: '',
+            is_main: false,
+            probe_application: ''
+        });
+
+        newWasAppServerConfig.set({
+            was_config_oid: 0,
+            feature_oid: 0,
+            was_con_oid: 0,
+            upload_mode_enabled: false,
+            was_cell: '',
+            was_node: '',
+            was_cluster: '',
+            was_name: '',
+            targets: '',
+        });
+
+        newTomcatAppServerConfig.set({
+            tomcat_config_oid: 0,
+            feature_oid: 0,
+            server_name: '',
+            port: 0,
+            binary_location: '',
+            portlets_location: '',
+        });
+    }
+
+    viewingMode = false;
+    editingIndex = index;
+    toggleSSHPopover(true);
+}
 
     // Function to deep clone an object
     function deepClone<T>(obj: T): T {
@@ -386,6 +440,43 @@ async function deleteWASConnection(con_oid: number) {
             errorMessage.set('Error loading environments.');
         }
     });
+
+     // Reactive statement to check if the environment name is unique
+      let isEnvNameUnique = writable(true);
+      let originalEnvName = writable('');
+      // $: {
+      //    const envName = $environmentDetails.env_name.trim().toLowerCase();
+      //    isEnvNameUnique.set(!$environments.some(env => env.env_name.toLowerCase() === envName));
+      //    if (!isEnvNameUnique) {
+      //      errorMessage.set('Environment name already exists. Please choose a different name.');
+      //    } else {
+      //      errorMessage.set('');
+      //    }
+      //  }
+
+      onMount(() => {
+  originalEnvName.set($environmentDetails.env_name.trim().toLowerCase());
+});
+
+$: {
+  const envName = $environmentDetails.env_name.trim().toLowerCase();
+  const currentEnvId = get(selectedEnvironmentId);
+  const originalName = get(originalEnvName);
+
+  isEnvNameUnique.set(
+    envName === originalName || 
+    // If the name is the same as the original name, consider it unique
+    !$environments.some(
+      env => env.env_oid !== currentEnvId && env.env_name.toLowerCase() === envName
+    )
+  );
+
+  if (!get(isEnvNameUnique) && envName !== originalName) {
+    errorMessage.set('Environment name already exists. Please choose a different name.');
+  } else {
+    errorMessage.set('');
+  }
+}
 
     // Fetch the details of the selected environment
     async function fetchEnvironmentDetails(envId: number) {
@@ -587,7 +678,7 @@ async function deleteWASConnection(con_oid: number) {
     }
 }
 
-  async function updateEnvironmentDetails() {
+  async function updateEnvironmentDetails1() {
     showProgressPopover = true;
         progressValue = 0;
         updateMessage = '';
@@ -603,9 +694,12 @@ async function deleteWASConnection(con_oid: number) {
       const tlmDetails = get(tlmConnection);
       const wasDetails = get(wasConnections);
       const sshProbes = get(probeSSHConnections);
-      const remoteFeatures = get(newRemoteConnectionFeature);
+      // const remoteFeatures = get(newRemoteConnectionFeature);
       const wasAppConfig = get(newWasAppServerConfig);
       const tomcatAppConfig = get(newTomcatAppServerConfig);
+      const remoteFeatures = get(remoteConnectionFeatures); // Updated to get all features
+        const wasAppConfigs = get(wasAppServerConfigs); // Updated to get all WAS app configs
+        const tomcatAppConfigs = get(tomcatAppServerConfigs);
 
       // Update environment details
       await client.mutate({
@@ -779,84 +873,183 @@ async function deleteWASConnection(con_oid: number) {
 
       progressValue += 10;
 
+           
+    console.log('Remote Connection Features:', remoteFeatures);
+    console.log('Environment ID:', envId);
+
+      const tempIdMap = new Map();
+
        // Update probe SSH connections
        for (const sshProbe of sshProbes) {
-            await client.mutate({
-                mutation: UPDATE_SSH_CONNECTION,
-                variables: {
-                    con_oid: sshProbe.con_oid,
-                    auth_type: sshProbe.authType,
-                    host: sshProbe.host,
-                    port: sshProbe.port,
-                    username: sshProbe.username,
-                    password: sshProbe.password,
-                    private_key: sshProbe.privateKey,
-                    public_key: sshProbe.publicKey,
-                    passphrase: sshProbe.passphrase
-                }
-            });
+            if (sshProbe.con_oid.toString().length >= 13) {
+                // Create new SSH connection
+                const createSshResponse = await client.mutate({
+                    mutation: CREATE_SSH_CONNECTION,
+                    variables: {
+                        env_oid: get(selectedEnvironmentId),
+                        auth_type: sshProbe.authType,
+                        host: sshProbe.host,
+                        port: sshProbe.port,
+                        username: sshProbe.username,
+                        password: sshProbe.password,
+                        private_key: sshProbe.privateKey,
+                        public_key: sshProbe.publicKey,
+                        passphrase: sshProbe.passphrase
+                    }
+                });
+               if (createSshResponse.data && createSshResponse.data.insert_console_sshconnection_one) {
+                        const realConOid = createSshResponse.data.insert_console_sshconnection_one.con_oid;
+                        tempIdMap.set(sshProbe.con_oid, realConOid); 
+                        sshProbe.con_oid = realConOid; 
+                    } else {
+                        console.error('Failed to create SSH connection:', createSshResponse);
+                    }
+            } else {
+                // Update existing SSH connection
+                await client.mutate({
+                    mutation: UPDATE_SSH_CONNECTION,
+                    variables: {
+                        con_oid: sshProbe.con_oid,
+                        auth_type: sshProbe.authType,
+                        host: sshProbe.host,
+                        port: sshProbe.port,
+                        username: sshProbe.username,
+                        password: sshProbe.password,
+                        private_key: sshProbe.privateKey,
+                        public_key: sshProbe.publicKey,
+                        passphrase: sshProbe.passphrase
+                    }
+                });
+            }
         }
 
         progressValue += 10;
 
-        // Update Remote Connection Features
-       // Ensure feature_oid is not null or undefined
-       if (remoteFeatures.feature_oid) {
-            await client.mutate({
-                mutation: UPDATE_REMOTE_CONNECTION_FEATURE,
-                variables: {
-                    feature_oid: remoteFeatures.feature_oid,
-                    ssh_con_oid: remoteFeatures.ssh_con_oid,
-                    was_con_oid: remoteFeatures.was_con_oid,
-                    propagation: remoteFeatures.propagation,
-                    installation: remoteFeatures.installation,
-                    dmgr: remoteFeatures.dmgr,
-                    instance_name: remoteFeatures.instance_name,
-                    type: remoteFeatures.type,
-                    app_server: remoteFeatures.app_server,
-                    is_main: remoteFeatures.is_main,
-                    probe_application: remoteFeatures.probe_application
-                }
-            });
-        } else {
-          
-            console.error('Remote Connection Feature OID is null or undefined:', remoteFeatures);
+  
+    // Update Remote Connection Features
+    for (const feature of remoteFeatures) {
+          console.log('Processing feature:', feature);
+            if (feature.feature_oid && feature.feature_oid.toString().length >= 13) {
+              if (tempIdMap.has(feature.ssh_con_oid)) {
+                        feature.ssh_con_oid = tempIdMap.get(feature.ssh_con_oid);
+                    }
+
+                // Create new feature
+                const createFeatureResponse = await client.mutate({
+                    mutation: CREATE_REMOTE_CONNECTION_FEATURE,
+                    variables: {
+                        ssh_con_oid: feature.ssh_con_oid,
+                        was_con_oid: feature.was_con_oid,
+                        propagation: feature.propagation,
+                        installation: feature.installation,
+                        dmgr: feature.dmgr,
+                        instance_name: feature.instance_name,
+                        type: feature.type,
+                        app_server: feature.app_server,
+                        is_main: feature.is_main,
+                        probe_application: feature.probe_application,
+                        env_oid: get(selectedEnvironmentId)
+                    }
+                });
+                if (createFeatureResponse.data && createFeatureResponse.data.insert_console_remoteconnectionfeature_one) {
+                        const realFeatureOid = createFeatureResponse.data.insert_console_remoteconnectionfeature_one.feature_oid;
+                        feature.feature_oid = realFeatureOid; // Update the temporary ID
+
+                        // Create app server config based on type
+                        if (feature.type === 'Websphere') {
+                            const wasConfig = wasAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                            if (wasConfig) {
+                                await client.mutate({
+                                    mutation: CREATE_WAS_APP_SERVER_CONFIG,
+                                    variables: {
+                                        upload_mode_enabled: wasConfig.upload_mode_enabled,
+                                        was_cell: wasConfig.was_cell,
+                                        was_node: wasConfig.was_node,
+                                        was_cluster: wasConfig.was_cluster,
+                                        was_name: wasConfig.was_name,
+                                        was_con_oid: feature.was_con_oid,
+                                        targets: wasConfig.targets,
+                                        feature_oid: realFeatureOid 
+                                    }
+                                });
+                            }
+                        } else if (feature.type === 'Tomcat') {
+                            const tomcatConfig = tomcatAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                            if (tomcatConfig) {
+                                await client.mutate({
+                                    mutation: CREATE_TOMCAT_APP_SERVER_CONFIG,
+                                    variables: {
+                                        server_name: tomcatConfig.server_name,
+                                        port: tomcatConfig.port,
+                                        binary_location: tomcatConfig.binary_location,
+                                        portlets_location: tomcatConfig.portlets_location,
+                                        feature_oid: realFeatureOid 
+                                    }
+                                });
+                            }
+                        }
+                    } else {
+                        console.error('Failed to create Remote Connection Feature:', createFeatureResponse);
+                    }
+                } else if (feature.feature_oid) {
+                // Update existing feature
+                await client.mutate({
+                    mutation: UPDATE_REMOTE_CONNECTION_FEATURE,
+                    variables: {
+                        feature_oid: feature.feature_oid,
+                        ssh_con_oid: feature.ssh_con_oid,
+                        was_con_oid: feature.was_con_oid,
+                        propagation: feature.propagation,
+                        installation: feature.installation,
+                        dmgr: feature.dmgr,
+                        instance_name: feature.instance_name,
+                        type: feature.type,
+                        app_server: feature.app_server,
+                        is_main: feature.is_main,
+                        probe_application: feature.probe_application
+                    }
+                });
+
+                // Update app server config based on type
+                // if (feature.type === 'Websphere') {
+                //     const wasConfig = wasAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                //     if (wasConfig) {
+                //         await client.mutate({
+                //             mutation: UPDATE_WAS_APP_SERVER_CONFIG,
+                //             variables: {
+                //                 was_config_oid: wasConfig.was_config_oid,
+                //                 upload_mode_enabled: wasConfig.upload_mode_enabled,
+                //                 was_cell: wasConfig.was_cell,
+                //                 was_node: wasConfig.was_node,
+                //                 was_cluster: wasConfig.was_cluster,
+                //                 was_name: wasConfig.was_name,
+                //                 was_con_oid: feature.was_con_oid,
+                //                 targets: wasConfig.targets,
+                //                 feature_oid: feature.feature_oid
+                //             }
+                //         });
+                //     }
+                // } else if (feature.type === 'Tomcat') {
+                //     const tomcatConfig = tomcatAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                //     if (tomcatConfig) {
+                //         await client.mutate({
+                //             mutation: UPDATE_TOMCAT_APP_SERVER_CONFIG,
+                //             variables: {
+                //                 tomcat_config_oid: tomcatConfig.tomcat_config_oid,
+                //                 server_name: tomcatConfig.server_name,
+                //                 port: tomcatConfig.port,
+                //                 binary_location: tomcatConfig.binary_location,
+                //                 portlets_location: tomcatConfig.portlets_location,
+                //                 feature_oid: feature.feature_oid
+                //             }
+                //         });
+                //     }
+                // }
+            } else {
+                console.error('Remote Connection Feature OID is null or undefined:', feature);
+            }
         }
         progressValue += 10;
-    // Update WebSphere App Server Config if the type is Websphere
-    if (remoteFeatures.type === 'Websphere') {
-        console.log('WebSphere App Server Config:>>>>>>>>', wasAppConfig)
-            await client.mutate({
-                mutation: UPDATE_WAS_APP_SERVER_CONFIG,
-                variables: {
-                    was_config_oid: wasAppConfig.was_config_oid, 
-                    upload_mode_enabled: wasAppConfig.upload_mode_enabled, 
-                    was_cell: wasAppConfig.was_cell, 
-                    was_node: wasAppConfig.was_node, 
-                    was_cluster: wasAppConfig.was_cluster, 
-                    was_name: wasAppConfig.was_name, 
-                    was_con_oid: remoteFeatures.was_con_oid,
-                    targets: wasAppConfig.targets
-                }
-            });
-        }
-        progressValue += 10;
-
-       // Update Tomcat App Server Config if the type is Tomcat
-       if (remoteFeatures.type === 'Tomcat') {
-            await client.mutate({
-                mutation: UPDATE_TOMCAT_APP_SERVER_CONFIG,
-                variables: {
-                    tomcat_config_oid: tomcatAppConfig.tomcat_config_oid, 
-                    server_name: tomcatAppConfig.server_name, 
-                    port: tomcatAppConfig.port,
-                    binary_location: tomcatAppConfig.binary_location,
-                    portlets_location: tomcatAppConfig.portlets_location, 
-                    feature_oid: remoteFeatures.feature_oid
-                }
-            });
-        }
-
     updateMessage = 'Environment connections updated successfully';
 
     } catch (error) {
@@ -865,6 +1058,395 @@ async function deleteWASConnection(con_oid: number) {
         updateMessage = 'Error updating environment details: '+ error;
     }
    }
+
+   async function updateEnvironmentDetails() {
+    showProgressPopover = true;
+    progressValue = 0;
+    updateMessage = '';
+
+    try {
+        const envId = get(selectedEnvironmentId);
+        const envDetails = get(environmentDetails);
+        const sshDetails = get(sshConnection);
+        const sftpDetails = get(sftpConnection);
+        const bpmDetails = get(bpmConnection);
+        const hostDetails = get(hostConnection);
+        const x3sDetails = get(x3sConnection);
+        const tlmDetails = get(tlmConnection);
+        const wasDetails = get(wasConnections);
+        const sshProbes = get(probeSSHConnections);
+        const remoteFeatures = get(remoteConnectionFeatures); // Updated to get all features
+        const wasAppConfigs = get(wasAppServerConfigs); // Updated to get all WAS app configs
+        const tomcatAppConfigs = get(tomcatAppServerConfigs);
+
+        console.log('Remote Connection Features:', remoteFeatures);
+        console.log('Environment ID:', envId); // Log envId
+
+        // Update environment details
+        await client.mutate({
+            mutation: UPDATE_ENVIRONMENT,
+            variables: {
+                env_oid: envId,
+                env_name: envDetails.env_name,
+                host_type: envDetails.host_type,
+                encryption_type: envDetails.encryption_type,
+                communication_type: envDetails.communication_type
+            }
+        });
+        progressValue += 10;
+
+        // Update SSH connection
+        await client.mutate({
+            mutation: UPDATE_SSH_CONNECTION,
+            variables: {
+                con_oid: sshDetails.con_oid,
+                auth_type: sshDetails.authType,
+                host: sshDetails.host,
+                port: sshDetails.port,
+                username: sshDetails.username,
+                password: sshDetails.password,
+                private_key: sshDetails.privateKey,
+                public_key: sshDetails.publicKey,
+                passphrase: sshDetails.passphrase
+            }
+        });
+
+        progressValue += 10;
+
+        // Update SFTP connection
+        await client.mutate({
+            mutation: UPDATE_SFTP_CONNECTION,
+            variables: {
+                con_oid: sftpDetails.con_oid,
+                ssh_con_oid: sftpDetails.sshConOid,
+                remote_directory: sftpDetails.remoteDirectory,
+                is_active: sftpDetails.isActive
+            }
+        });
+
+        progressValue += 10;
+
+        // Update BPM connection
+        await client.mutate({
+            mutation: UPDATE_BPM_CONNECTION,
+            variables: {
+                con_oid: bpmDetails.con_oid,
+                username: bpmDetails.username,
+                language: bpmDetails.language,
+                password: bpmDetails.password
+            }
+        });
+
+        progressValue += 10;
+
+        // Update Host connection
+        await client.mutate({
+            mutation: UPDATE_DATABASE_CONNECTION,
+            variables: {
+                con_oid: hostDetails.con_oid,
+                type: hostDetails.type,
+                free_entry: hostDetails.freeEntry,
+                host: hostDetails.host,
+                port: hostDetails.port,
+                username: hostDetails.username,
+                password: hostDetails.password,
+                url: hostDetails.url,
+                schema: hostDetails.schema,
+                sid: hostDetails.sid,
+                service: hostDetails.service,
+                secured: hostDetails.secured
+            }
+        });
+
+        progressValue += 10;
+
+        // Update X3S connection
+        await client.mutate({
+            mutation: UPDATE_DATABASE_CONNECTION,
+            variables: {
+                con_oid: x3sDetails.con_oid,
+                type: x3sDetails.type,
+                free_entry: x3sDetails.freeEntry,
+                host: x3sDetails.host,
+                port: x3sDetails.port,
+                username: x3sDetails.username,
+                password: x3sDetails.password,
+                url: x3sDetails.url,
+                schema: x3sDetails.schema,
+                sid: x3sDetails.sid,
+                service: x3sDetails.service,
+                secured: x3sDetails.secured
+            }
+        });
+
+        progressValue += 10;
+
+        // Update TLM connection
+        await client.mutate({
+            mutation: UPDATE_DATABASE_CONNECTION,
+            variables: {
+                con_oid: tlmDetails.con_oid,
+                type: tlmDetails.type,
+                free_entry: tlmDetails.freeEntry,
+                host: tlmDetails.host,
+                port: tlmDetails.port,
+                username: tlmDetails.username,
+                password: tlmDetails.password,
+                url: tlmDetails.url,
+                schema: tlmDetails.schema,
+                sid: tlmDetails.sid,
+                service: tlmDetails.service,
+                secured: tlmDetails.secured
+            }
+        });
+
+        progressValue += 10;
+
+        // Map to hold temporary ID to real ID
+        const tempIdMap = new Map();
+
+        // Update WAS connections
+        for (const wasDetail of wasDetails) {
+            if (wasDetail.con_oid.toString().length >= 13) {
+                // Create new WAS connection
+                const createWasResponse = await client.mutate({
+                    mutation: CREATE_WAS_CONNECTION,
+                    variables: {
+                        env_oid: envId, // Ensure envId is used here
+                        name: wasDetail.name,
+                        host: wasDetail.host,
+                        port: wasDetail.port,
+                        security_enabled: wasDetail.securityEnabled,
+                        username: wasDetail.username,
+                        password: wasDetail.password,
+                        key_store_type: wasDetail.keystoreType,
+                        ssl_config_url: wasDetail.sslConfigUrl,
+                        soap_config_url: wasDetail.soapConfigUrl,
+                        sas_config_url: wasDetail.sasConfigUrl,
+                        truststore: wasDetail.truststore,
+                        truststore_password: wasDetail.truststorePassword,
+                        keystore: wasDetail.keystore,
+                        keystore_password: wasDetail.keystorePassword
+                    }
+                });
+                const realWasConOid = createWasResponse.data.insert_console_wasconnection_one.con_oid;
+                tempIdMap.set(wasDetail.con_oid, realWasConOid); // Map temporary ID to real ID
+                wasDetail.con_oid = realWasConOid; // Update the temporary ID
+            } else {
+                // Update existing WAS connection
+                await client.mutate({
+                    mutation: UPDATE_WAS_CONNECTION,
+                    variables: {
+                        con_oid: wasDetail.con_oid,
+                        env_oid: wasDetail.env_oid,
+                        name: wasDetail.name,
+                        host: wasDetail.host,
+                        port: wasDetail.port,
+                        security_enabled: wasDetail.securityEnabled,
+                        username: wasDetail.username,
+                        password: wasDetail.password,
+                        key_store_type: wasDetail.keystoreType,
+                        ssl_config_url: wasDetail.sslConfigUrl,
+                        soap_config_url: wasDetail.soapConfigUrl,
+                        sas_config_url: wasDetail.sasConfigUrl,
+                        truststore: wasDetail.truststore,
+                        truststore_password: wasDetail.truststorePassword,
+                        keystore: wasDetail.keystore,
+                        keystore_password: wasDetail.keystorePassword
+                    }
+                });
+            }
+        }
+
+        progressValue += 10;
+
+        // Update probe SSH connections
+        for (const sshProbe of sshProbes) {
+            try {
+                if (sshProbe.con_oid.toString().length >= 13) {
+                    // Create new SSH connection
+                    const createSshResponse = await client.mutate({
+                        mutation: CREATE_SSH_CONNECTION,
+                        variables: {
+                            env_oid: envId, // Ensure envId is passed here
+                            auth_type: sshProbe.authType,
+                            host: sshProbe.host,
+                            port: sshProbe.port,
+                            username: sshProbe.username,
+                            password: sshProbe.password,
+                            private_key: sshProbe.privateKey,
+                            public_key: sshProbe.publicKey,
+                            passphrase: sshProbe.passphrase
+                        }
+                    });
+                    if (createSshResponse.data && createSshResponse.data.insert_console_sshconnection_one) {
+                        const realConOid = createSshResponse.data.insert_console_sshconnection_one.con_oid;
+                        tempIdMap.set(sshProbe.con_oid, realConOid); // Map temporary ID to real ID
+                        sshProbe.con_oid = realConOid; // Update the temporary ID
+                    } else {
+                        console.error('Failed to create SSH connection:', createSshResponse);
+                    }
+                } else {
+                    // Update existing SSH connection
+                    await client.mutate({
+                        mutation: UPDATE_SSH_CONNECTION,
+                        variables: {
+                            con_oid: sshProbe.con_oid,
+                            auth_type: sshProbe.authType,
+                            host: sshProbe.host,
+                            port: sshProbe.port,
+                            username: sshProbe.username,
+                            password: sshProbe.password,
+                            private_key: sshProbe.privateKey,
+                            public_key: sshProbe.publicKey,
+                            passphrase: sshProbe.passphrase
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error updating/creating SSH connection:', error, sshProbe);
+            }
+        }
+
+        progressValue += 10;
+
+        // Update Remote Connection Features
+        for (const feature of remoteFeatures) {
+            try {
+                console.log('Processing feature:', feature); // Log each feature being processed
+                const realSshConOid = tempIdMap.get(feature.ssh_con_oid) || feature.ssh_con_oid;
+
+                if (feature.feature_oid && feature.feature_oid.toString().length >= 13) {
+                    // Create new feature
+                    const createFeatureResponse = await client.mutate({
+                        mutation: CREATE_REMOTE_CONNECTION_FEATURE,
+                        variables: {
+                            ssh_con_oid: realSshConOid,
+                            was_con_oid: feature.was_con_oid || null, // Ensure was_con_oid is null if not provided
+                            propagation: feature.propagation,
+                            installation: feature.installation,
+                            dmgr: feature.dmgr,
+                            instance_name: feature.instance_name,
+                            type: feature.type,
+                            app_server: feature.app_server,
+                            is_main: feature.is_main,
+                            probe_application: feature.probe_application,
+                            env_oid: envId // Ensure envId is passed here
+                        }
+                    });
+
+                    const realFeatureOid = createFeatureResponse.data.insert_console_remoteconnectionfeature_one.feature_oid;
+
+                    console.log("feature type>>>>>>>", feature.type);
+                    if (createFeatureResponse.data && createFeatureResponse.data.insert_console_remoteconnectionfeature_one) {
+                        const realFeatureOid = createFeatureResponse.data.insert_console_remoteconnectionfeature_one.feature_oid;
+                        feature.feature_oid = realFeatureOid;
+
+                        if (feature.type === 'Websphere') {
+                            const wasConfig = wasAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                            if (wasConfig) {
+                                await client.mutate({
+                                    mutation: CREATE_WAS_APP_SERVER_CONFIG,
+                                    variables: {
+                                        upload_mode_enabled: wasConfig.upload_mode_enabled,
+                                        was_cell: wasConfig.was_cell,
+                                        was_node: wasConfig.was_node,
+                                        was_cluster: wasConfig.was_cluster,
+                                        was_name: wasConfig.was_name,
+                                        was_con_oid: feature.was_con_oid || null,
+                                        targets: wasConfig.targets,
+                                        feature_oid: realFeatureOid 
+                                    }
+                                });
+                            }
+                        }
+                        else if (feature.type === 'Tomcat') {
+                            const tomcatConfig = tomcatAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                            if (tomcatConfig) {
+                                await client.mutate({
+                                    mutation: CREATE_TOMCAT_APP_SERVER_CONFIG,
+                                    variables: {
+                                        server_name: tomcatConfig.server_name,
+                                        port: tomcatConfig.port,
+                                        binary_location: tomcatConfig.binary_location,
+                                        portlets_location: tomcatConfig.portlets_location,
+                                        feature_oid: realFeatureOid
+                                    }
+                                });
+                            }
+                        }
+                      }
+                } else if (feature.feature_oid) {
+                    // Update existing feature
+                    await client.mutate({
+                        mutation: UPDATE_REMOTE_CONNECTION_FEATURE,
+                        variables: {
+                            feature_oid: feature.feature_oid,
+                            ssh_con_oid: feature.ssh_con_oid,
+                            was_con_oid: feature.was_con_oid || null,
+                            propagation: feature.propagation,
+                            installation: feature.installation,
+                            dmgr: feature.dmgr,
+                            instance_name: feature.instance_name,
+                            type: feature.type,
+                            app_server: feature.app_server,
+                            is_main: feature.is_main,
+                            probe_application: feature.probe_application
+                        }
+                    });
+
+                    // Update app server config based on type
+                    if (feature.type === 'Websphere') {
+                        const wasConfig = wasAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                        if (wasConfig) {
+                            await client.mutate({
+                                mutation: UPDATE_WAS_APP_SERVER_CONFIG,
+                                variables: {
+                                    was_config_oid: wasConfig.was_config_oid,
+                                    upload_mode_enabled: wasConfig.upload_mode_enabled,
+                                    was_cell: wasConfig.was_cell,
+                                    was_node: wasConfig.was_node,
+                                    was_cluster: wasConfig.was_cluster,
+                                    was_name: wasConfig.was_name,
+                                    was_con_oid: feature.was_con_oid || null,
+                                    targets: wasConfig.targets,
+                                    feature_oid: feature.feature_oid
+                                }
+                            });
+                        }
+                    } else if (feature.type === 'Tomcat') {
+                        const tomcatConfig = tomcatAppConfigs.find(config => config.feature_oid === feature.feature_oid);
+                        if (tomcatConfig) {
+                            await client.mutate({
+                                mutation: UPDATE_TOMCAT_APP_SERVER_CONFIG,
+                                variables: {
+                                    tomcat_config_oid: tomcatConfig.tomcat_config_oid,
+                                    server_name: tomcatConfig.server_name,
+                                    port: tomcatConfig.port,
+                                    binary_location: tomcatConfig.binary_location,
+                                    portlets_location: tomcatConfig.portlets_location,
+                                    feature_oid: feature.feature_oid
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    console.error('Remote Connection Feature OID is null or undefined:', feature);
+                }
+            } catch (error) {
+                console.error('Error updating/creating Remote Connection Feature:', error, feature);
+            }
+        }
+        progressValue += 10;
+        updateMessage = 'Environment connections updated successfully';
+
+    } catch (error) {
+        console.error('Error updating environment details:', error);
+        errorMessage.set('Error updating environment details.');
+        updateMessage = 'Error updating environment details: ' + error;
+    }
+}
+
 
     // Watch for changes in selected environment and load its details
     selectedEnvironmentId.subscribe(async (envId) => {
@@ -889,10 +1471,51 @@ async function deleteWASConnection(con_oid: number) {
     $: if ($remoteConnectionFeatures.length > 0) console.log('Current Remote Connection Features:', $remoteConnectionFeatures);
 
 
-    async function testConnection(connection: any, index: number, connectionType: string) {
-    // openProgressPopover();
-    // testMessage.set(`Starting test for connection ${index + 1}...`);
+    
+
     let testMessage = writable('');
+    let technicalMessage = writable('');
+    let testingInProgress = writable(false);
+    let testProgress = writable(0);
+
+    function openProgressPopover() {
+      showProgressPopover = true;
+      testingInProgress.set(true);
+      testProgress.set(0);
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeProgressPopover() {
+        showProgressPopover = false;
+        testingInProgress.set(false);
+        document.body.style.overflow = 'auto';
+    }
+
+    async function testConnection(connection: any, index: number, connectionType: string) {
+    
+    openProgressPopover();
+    testMessage.set(`Starting test for connection ${index + 1}...`);
+
+    // Reset the specific connection status to initial state
+  connectionStatuses.update(statuses => {
+    if (connectionType === 'BDDHOST') {
+      return { ...statuses, host: 'success' };
+    } else if (connectionType === 'BDDX3S') {
+      return { ...statuses, x3s: 'success' };
+    } else if (connectionType === 'BDDTLM') {
+      return { ...statuses, tlm: 'success' };
+    } else if (connectionType === 'SSH') {
+      const newStatuses = [...statuses.ssh];
+      newStatuses[index] = 'success';
+      return { ...statuses, ssh: newStatuses };
+    }
+    return statuses;
+  });
+
+  
+  testMessage.set('');
+  technicalMessage.set('');
+
     const testUrl = 'http://localhost:8085/console/env-management/v1/test-connections';
     const requestBody = {
       envName: $environmentDetails.env_name,
@@ -933,34 +1556,83 @@ async function deleteWASConnection(con_oid: number) {
         body: JSON.stringify(requestBody)
       });
 
-       // Update the progress bar incrementally
-    //    let timer = setInterval(() => {
-    //         testProgress.update(n => {
-    //             if (n < 100) return n + 10; // Increment by 10%
-    //             clearInterval(timer);
-    //             return 100;
-    //         });
-    //     }, 1000); 
+      //  Update the progress bar incrementally
+       let timer = setInterval(() => {
+            testProgress.update(n => {
+                if (n < 100) return n + 10; // Increment by 10%
+                clearInterval(timer);
+                return 100;
+            });
+        }, 1000); 
+
+        if (response.status === 400) {
+      throw new Error('Bad request');
+    }
 
       const responseData = await response.json();
-    //   clearInterval(timer);
+      clearInterval(timer);
 
-      if (responseData.success) {
-        testMessage.set(`Connection ${index + 1} tested successfully!`);
-      } else {
-        const errorMessages = responseData.data.connections[0].testResult.feedbacks.join(', ') || 'Unknown error';
-        testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
+    if (responseData.success) {
+      testMessage.set(`Connection ${index + 1} tested successfully!`);
+      if (connectionType === 'BDDHOST') {
+        connectionStatuses.update(statuses => ({ ...statuses, host: 'success' }));
+      } else if (connectionType === 'BDDX3S') {
+        connectionStatuses.update(statuses => ({ ...statuses, x3s: 'success' }));
+      } else if (connectionType === 'BDDTLM') {
+        connectionStatuses.update(statuses => ({ ...statuses, tlm: 'success' }));
+      } else if (connectionType === 'SSH') {
+        connectionStatuses.update(statuses => {
+          const newStatuses = [...statuses.ssh];
+          newStatuses[index] = 'success';
+          return { ...statuses, ssh: newStatuses };
+        });
       }
-    //   testProgress.set(100);
-    } catch (error) {
+    } else {
+      const errorMessages = responseData.data.connections[0].testResult.feedbacks.join(', ') || 'Unknown error';
+      testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
+      if (connectionType === 'BDDHOST') {
+        connectionStatuses.update(statuses => ({ ...statuses, host: 'failure' }));
+      } else if (connectionType === 'BDDX3S') {
+        connectionStatuses.update(statuses => ({ ...statuses, x3s: 'failure' }));
+      } else if (connectionType === 'BDDTLM') {
+        connectionStatuses.update(statuses => ({ ...statuses, tlm: 'failure' }));
+      } else if (connectionType === 'SSH') {
+        connectionStatuses.update(statuses => {
+          const newStatuses = [...statuses.ssh];
+          newStatuses[index] = 'failure';
+          return { ...statuses, ssh: newStatuses };
+        });
+      }
+    }
+      testProgress.set(100);
+    } catch (error: any) {
       console.error('Failed to test connection', index, error);
+      testMessage.set(`Failed to test connection ${index + 1}: ${error.message}`);
+      technicalMessage.set(`Failed to test connection ${index + 1}: ${error.message}`);
+      testProgress.set(100);
+    
+    // Update the connectionStatuses store to 'failure' for the tested connection
+    connectionStatuses.update(statuses => {
+      if (connectionType === 'BDDHOST') {
+        return { ...statuses, host: 'failure' };
+      } else if (connectionType === 'BDDX3S') {
+        return { ...statuses, x3s: 'failure' };
+      } else if (connectionType === 'BDDTLM') {
+        return { ...statuses, tlm: 'failure' };
+      } else if (connectionType === 'SSH') {
+        const newStatuses = [...statuses.ssh];
+        newStatuses[index] = 'failure';
+        return { ...statuses, ssh: newStatuses };
+      }
+      return statuses;
+    });
+
     }
   }
 
   async function testSshConnection(connection: any, index: number) {
-
+    openProgressPopover();
    
-    let testMessage = writable('');
     testMessage.set(`Starting test for connection ${index + 1}...`);
     console.log($environmentDetails.env_name);
     console.log($environmentDetails.host_type,);
@@ -1000,27 +1672,47 @@ async function deleteWASConnection(con_oid: number) {
             body: JSON.stringify(requestBody)
         });
 
-    
+        let timer = setInterval(() => {
+            testProgress.update(n => {
+                if (n < 100) return n + 10;
+                clearInterval(timer);
+                return 100;
+            });
+        }, 100); // Adjust interval speed as needed
+
         const responseData = await response.json();
-       
+        clearInterval(timer);
         console.log('Response data:', responseData);
 
         if (responseData.success) {
             testMessage.set(`Connection ${index + 1} tested successfully!`);
         } else {
             const errorMessages = responseData.data.connections[0].testResult.feedbacks.join(', ') || 'Unknown error';
-            testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);
+            testMessage.set(`Connection ${index + 1} failed: ${errorMessages}`);//should be replace by user friendly error
+            technicalMessage.set(errorMessages);
         }
+        testProgress.set(100);
     } catch (error) {
         console.error('Failed test for connection', index, error);
-        testMessage.set(`Failed test for connection ${index + 1}: ${error.message}`);
+        
+        
+        testProgress.set(100);
     }
-}
+  }
 
-async function testMailboxConnections() {
- 
-  let testMessage = writable('');
+  async function testMailboxConnections() {
+  openProgressPopover();
   testMessage.set(`Starting test for mailbox connections...`);
+  connectionStatuses.set({
+    ssh: [],
+    was: [],
+    host: 'success',
+    tlm: 'success',
+    x3s: 'success',
+    singleSsh: 'success',
+    sftp: 'success'
+  });
+  testMessage.set('');
 
   const testUrl = 'http://localhost:8085/console/env-management/v1/test-connections';
   const requestBody = {
@@ -1073,28 +1765,102 @@ async function testMailboxConnections() {
       },
       body: JSON.stringify(requestBody)
     });
-
-   
-    const responseData = await response.json();
  
+    let timer = setInterval(() => {
+      testProgress.update(n => {
+        if (n < 100) return n + 10;
+        clearInterval(timer);
+        return 100;
+      });
+    }, 100);
+
+    if (response.status === 400) {
+      throw new Error('Bad request');
+    }
+
+    const responseData = await response.json();
+    clearInterval(timer);
 
     if (responseData.success) {
       testMessage.set(`Mailbox connections tested successfully!`);
+      
+      connectionStatuses.update(statuses => ({
+        ...statuses,
+        singleSsh: 'success',
+        sftp: 'success'
+      }));
     } else {
       const feedbacks = responseData.data.connections.map((conn: any, idx: number) =>
         `Connection ${idx + 1} (${conn.connection.connectionType}): ${conn.testResult.feedbacks.join(', ')}`
       ).join('\n');
       testMessage.set(`Test results:\n${feedbacks}`);
+      technicalMessage.set(`Test results:\n${feedbacks}`);
+      responseData.data.connections.forEach((conn: any, idx: number) => {
+        const status = conn.testResult.success ? 'success' : 'failure';
+        if (conn.connection.connectionType === 'SSH') {
+          connectionStatuses.update(statuses => ({ ...statuses, singleSsh: status }));
+        } else if (conn.connection.connectionType === 'SFTP') {
+          connectionStatuses.update(statuses => ({ ...statuses, sftp: status }));
+        }
+      });
     }
-  
+   testProgress.set(100);
   } catch (error) {
     console.error('Failed to test mailbox connections', error);
     testMessage.set('Failed to test mailbox connections. Please try again.');
+    testProgress.set(100);
   } 
-}
+  }
 
-async function testAllConnections() {
-  let testMessage = writable('');
+  const sshConnectionsDetails = get(sshConnections).map((connection, index) => ({
+    action: "test",
+    connection: {
+      connectionType: "SSH",
+      authType: connection.authType,
+      host: connection.host,
+      port: connection.port,
+      user: connection.username,
+      password: connection.password,
+      privateKey: connection.privateKey,
+      publicKey: connection.publicKey,
+      passphrase: connection.passphrase
+    }
+  }));
+
+  const wasConnectionsDetails = get(wasConnections).map((connection, index) => ({
+    action: "test",
+    connection: {
+      connectionType: "WAS",
+      host: connection.host,
+      port: connection.port,
+      securityEnabled: connection.securityEnabled,
+      username: connection.username,
+      password: connection.password,
+      sslConfigURL: connection.sslConfigUrl,
+      soapConfigURL: connection.soapConfigUrl,
+      sasConfigURL: connection.sasConfigUrl,
+      trustStore: connection.truststore,
+      trustStorePassword: connection.truststorePassword,
+      keyStore: connection.keystore,
+      keyStorePassword: connection.keystorePassword
+    }
+  }));
+
+  async function testAllConnections() {
+    openProgressPopover();
+      // Reset connectionStatuses to initial state
+      connectionStatuses.set({
+    ssh: [],
+    was: [],
+    host: 'success',
+    tlm: 'success',
+    x3s: 'success',
+    singleSsh: 'success',
+    sftp: 'success'
+  });
+  testMessage.set('');
+  technicalMessage.set('');
+
   testMessage.set('Starting test for all connections...');
 
   const testUrl = 'http://localhost:8085/console/env-management/v1/test-connections';
@@ -1104,6 +1870,7 @@ async function testAllConnections() {
     encryptionType: $environmentDetails.encryption_type,
     communicationType: 'SSH',
     sshConnections: [
+      ...sshConnectionsDetails
     ],
     connections: [
       {
@@ -1195,24 +1962,51 @@ async function testAllConnections() {
       body: JSON.stringify(requestBody)
     });
 
+    let timer = setInterval(() => {
+      testProgress.update(n => {
+        if (n < 100) return n + 10;
+        clearInterval(timer);
+        return 100;
+      });
+    }, 100);
+
+    if (response.status === 400) {
+      throw new Error('Bad request');
+    }
+
+
     const responseData = await response.json();
+    clearInterval(timer);
     console.log('Response data:', responseData);
 
     if (responseData.success) {
       testMessage.set('All connections tested successfully!');
+      connectionStatuses.set({
+        ssh: sshConnectionsDetails.map(() => 'success'),
+        was: wasConnectionsDetails.map(() => 'success'),
+        host: 'success',
+        tlm: 'success',
+        x3s: 'success',
+        singleSsh: 'success',
+        sftp: 'success'
+      });
+      testProgress.set(100);
     } else {
       const feedbacks = responseData.data.connections.map((conn: any, idx: number) =>
         `Connection ${idx + 1} (${conn.connection.connectionType}): ${conn.testResult.feedbacks.join(', ')}`
       ).join('\n');
       testMessage.set(`Test results:\n${feedbacks}`);
+      
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to test all connections', error);
+    technicalMessage.set(error)
     testMessage.set('Failed to test all connections. Please try again.');
+    testProgress.set(100);
   }
-}
+  }
 
-function addNewSSHConnection() {
+  function addNewSSHConnection() {
     const newConnection: SSHConnectionInfo = {
         con_oid: Date.now(), // Temporary ID, to be replaced by actual ID from database
         authType: 'Password', // Correctly typed as 'Password' | 'Identity'
@@ -1264,45 +2058,49 @@ function addNewSSHConnection() {
     newTomcatAppServerConfig.set(newTomcatConfig);
 
     toggleSSHPopover(false);
-}
+  }
 
-function handleSaveSSHConnection() {
-        const currentConnection = get(newSshConnections);
-        const allConnections = get(sshConnections);
-        const temp_id = currentConnection.con_oid ? currentConnection.con_oid : Date.now();
+  function handleSaveSSHConnection() {
+    const currentConnection = get(newSshConnections);
+    const allConnections = get(sshConnections);
+    const allFeatures = get(remoteConnectionFeatures);
+    const temp_id = currentConnection.con_oid ? currentConnection.con_oid : Date.now();
 
-
-        const isDuplicateName = allConnections.some(conn => conn.host === currentConnection.host && conn.con_oid !== currentConnection.con_oid);
-
-        if (isDuplicateName) {
-            errorMessage.set('An SSH connection with this host already exists.');
-            return;
-        }
-
-        errorMessage.set('');
-
-        if (currentConnection.con_oid) {
-            // This is an update
-            sshConnections.update(connections => 
-                connections.map(conn => conn.con_oid === currentConnection.con_oid ? currentConnection : conn)
-            );
-        } else {
-            // This is an addition
-            // sshConnections.update(connections => [...connections, { ...currentConnection }]);
-            sshConnections.update(connections => [...connections, { ...currentConnection, con_oid: temp_id }]);
-        }
-
-        // Also update probeSSHConnections
-        const probeConnections = get(probeSSHConnections);
-        probeSSHConnections.set([...probeConnections, currentConnection]);
-
-        // Save to local storage
-        localStorage.setItem('probeSSHConnections', JSON.stringify(get(probeSSHConnections)));
-        console.log('Updated probeSSHConnections:', get(probeSSHConnections));
-        
-       // Add the new feature to remoteConnectionFeatures and log the updated features
     const currentFeature = get(newRemoteConnectionFeature);
     const featureTempId = Date.now();
+
+    // Check for duplicate instance names
+    const isDuplicateInstanceName = allFeatures.some(feature => 
+        feature.instance_name === currentFeature.instance_name && 
+        feature.feature_oid !== currentFeature.feature_oid &&
+        feature.env_oid === get(selectedEnvironmentId)
+    );
+
+    if (isDuplicateInstanceName) {
+        errorMessage.set('An SSH connection with this instance name already exists.');
+        return;
+    }
+    errorMessage.set('');
+
+    if (currentConnection.con_oid) {
+        // This is an update
+        sshConnections.update(connections => 
+            connections.map(conn => conn.con_oid === currentConnection.con_oid ? currentConnection : conn)
+        );
+    } else {
+        // This is an addition
+        sshConnections.update(connections => [...connections, { ...currentConnection, con_oid: temp_id }]);
+    }
+
+    // Also update probeSSHConnections
+    const probeConnections = get(probeSSHConnections);
+    probeSSHConnections.set([...probeConnections, currentConnection]);
+
+    // Save to local storage
+    localStorage.setItem('probeSSHConnections', JSON.stringify(get(probeSSHConnections)));
+    console.log('Updated probeSSHConnections:', get(probeSSHConnections));
+
+    // Add the new feature to remoteConnectionFeatures and log the updated features
     remoteConnectionFeatures.update(features => {
         const updatedFeatures = [...features, { ...currentFeature, feature_oid: featureTempId }];
         console.log('Updated Remote Connection Features:', updatedFeatures);
@@ -1335,21 +2133,20 @@ function handleSaveSSHConnection() {
     localStorage.setItem('wasAppServerConfigs', JSON.stringify(get(wasAppServerConfigs)));
     localStorage.setItem('tomcatAppServerConfigs', JSON.stringify(get(tomcatAppServerConfigs)));
 
-    
-        // Reset the newSshConnections store and close the modal
-        newSshConnections.set({
-            con_oid: 0,
-            authType: 'Password',
-            host: '',
-            port: 22,
-            username: '',
-            password: '',
-            privateKey: '',
-            publicKey: '',
-            passphrase: ''
-        });
+    // Reset the newSshConnections store and close the modal
+    newSshConnections.set({
+        con_oid: 0,
+        authType: 'Password',
+        host: '',
+        port: 22,
+        username: '',
+        password: '',
+        privateKey: '',
+        publicKey: '',
+        passphrase: ''
+    });
 
-        newRemoteConnectionFeature.set({
+    newRemoteConnectionFeature.set({
         ssh_con_oid: 0,
         was_con_oid: 0,
         propagation: false,
@@ -1383,13 +2180,130 @@ function handleSaveSSHConnection() {
         portlets_location: '',
     });
 
+    toggleSSHPopover(false);
+}
+    
+  function handleSaveSSHConnection1() {
+    const currentConnection = get(newSshConnections);
+    const allConnections = get(sshConnections);
+    const allFeatures = get(remoteConnectionFeatures);
+    const currentFeature = get(newRemoteConnectionFeature);
+    const temp_id = currentConnection.con_oid ? currentConnection.con_oid : Date.now();
 
-        toggleSSHPopover(false);
+    // Check for duplicate instance names within the same environment
+    const isDuplicateInstanceName = allFeatures.some(feature => 
+        feature.instance_name === currentFeature.instance_name && 
+        feature.env_oid === get(selectedEnvironmentId) &&
+        feature.feature_oid !== currentFeature.feature_oid // Ensure we exclude the current feature being edited
+    );
+
+    if (isDuplicateInstanceName) {
+        errorMessage.set('An SSH connection with this instance name already exists.');
+        return;
     }
+
+    errorMessage.set('');
+
+    if (currentConnection.con_oid) {
+        // This is an update
+        sshConnections.update(connections => 
+            connections.map(conn => conn.con_oid === currentConnection.con_oid ? currentConnection : conn)
+        );
+        probeSSHConnections.update(connections => 
+            connections.map(conn => conn.con_oid === currentConnection.con_oid ? currentConnection : conn)
+        );
+        remoteConnectionFeatures.update(features => 
+            features.map(feature => feature.ssh_con_oid === currentConnection.con_oid ? currentFeature : feature)
+        );
+    } else {
+        // This is an addition
+        sshConnections.update(connections => [...connections, { ...currentConnection, con_oid: temp_id }]);
+        probeSSHConnections.update(connections => [...connections, { ...currentConnection, con_oid: temp_id }]);
+        remoteConnectionFeatures.update(features => [...features, { ...currentFeature, feature_oid: temp_id }]);
+    }
+
+    localStorage.setItem('probeSSHConnections', JSON.stringify(get(probeSSHConnections)));
+    localStorage.setItem('remoteConnectionFeatures', JSON.stringify(get(remoteConnectionFeatures)));
+
+    if (currentFeature.type === 'Websphere') {
+        const currentWasConfig = get(newWasAppServerConfig);
+        wasAppServerConfigs.update(configs => {
+            const configIndex = configs.findIndex(config => config.feature_oid === currentFeature.feature_oid);
+            if (configIndex !== -1) {
+                configs[configIndex] = { ...currentWasConfig, feature_oid: temp_id };
+            } else {
+                configs.push({ ...currentWasConfig, feature_oid: temp_id });
+            }
+            return configs;
+        });
+    } else if (currentFeature.type === 'Tomcat') {
+        const currentTomcatConfig = get(newTomcatAppServerConfig);
+        tomcatAppServerConfigs.update(configs => {
+            const configIndex = configs.findIndex(config => config.feature_oid === currentFeature.feature_oid);
+            if (configIndex !== -1) {
+                configs[configIndex] = { ...currentTomcatConfig, feature_oid: temp_id };
+            } else {
+                configs.push({ ...currentTomcatConfig, feature_oid: temp_id });
+            }
+            return configs;
+        });
+    }
+
+    localStorage.setItem('wasAppServerConfigs', JSON.stringify(get(wasAppServerConfigs)));
+    localStorage.setItem('tomcatAppServerConfigs', JSON.stringify(get(tomcatAppServerConfigs)));
+
+    newSshConnections.set({
+        con_oid: 0,
+        authType: 'Password',
+        host: '',
+        port: 22,
+        username: '',
+        password: '',
+        privateKey: '',
+        publicKey: '',
+        passphrase: ''
+    });
+
+    newRemoteConnectionFeature.set({
+        ssh_con_oid: 0,
+        was_con_oid: 0,
+        propagation: false,
+        installation: false,
+        dmgr: false,
+        instance_name: '',
+        type: '',
+        app_server: '',
+        is_main: false,
+        probe_application: ''
+    });
+
+    newWasAppServerConfig.set({
+        was_config_oid: 0,
+        feature_oid: 0,
+        was_con_oid: 0,
+        upload_mode_enabled: false,
+        was_cell: '',
+        was_node: '',
+        was_cluster: '',
+        was_name: '',
+        targets: '',
+    });
+
+    newTomcatAppServerConfig.set({
+        tomcat_config_oid: 0,
+        feature_oid: 0,
+        server_name: '',
+        port: 22,
+        binary_location: '',
+        portlets_location: '',
+    });
+
+    toggleSSHPopover(false);
+}
 
 </script>
 
-<Popover.Root>
+<!-- <Popover.Root>
     {#if showProgressPopover}
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div class="relative p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 max-w-4xl w-full">
@@ -1401,7 +2315,33 @@ function handleSaveSSHConnection() {
             </div>
         </div>
     {/if}
-</Popover.Root>
+</Popover.Root> -->
+
+{#if showProgressPopover}
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="relative p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 max-w-3xl w-full max-h-screen overflow-y-auto">
+        <button
+            class="absolute top-3 right-3 text-gray-800 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-400"
+            on:click={closeProgressPopover}>
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <h2 class="text-xl font-bold dark:text-gray-300 mb-4">Testing Connection...</h2>
+        <Progress max={100} value={$testProgress} />
+        <div class="text-lg text-gray-800 pt-4 mt-4 dark:text-gray-300 whitespace-pre-line leading-relaxed">{$testMessage}
+          <Accordion.Root>
+            <Accordion.Item value="technical-details">
+              <Accordion.Trigger>Logs</Accordion.Trigger>
+              <Accordion.Content>
+                <pre>{$technicalMessage}</pre>
+              </Accordion.Content>
+            </Accordion.Item>
+          </Accordion.Root>
+        </div>
+    </div>
+</div>
+{/if}
 
 <div class="p-4 bg-white dark:bg-gray-800">
     <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Edit Environment</h2>
@@ -1423,7 +2363,10 @@ function handleSaveSSHConnection() {
                     <div class="flex items-center">
                         <label class="text-gray-700 dark:text-gray-300 w-1/4">Environment Name:</label>
                         <input type="text" bind:value={$environmentDetails.env_name} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900"/>
-                    </div>
+                        {#if !$isEnvNameUnique}
+                        <p class="text-red-500 dark:text-red-400 mt-2">Environment name already exists. Please choose a different name.</p>
+                      {/if}
+                      </div>
                     <div class="flex items-center">
                         <label class="text-gray-700 dark:text-gray-300 w-1/4">Host Type:</label>
                         <select bind:value={$environmentDetails.host_type} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900">
@@ -1452,6 +2395,7 @@ function handleSaveSSHConnection() {
             <!-- MailBox section  -->
             <button type="button" on:click={testMailboxConnections} class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">test</button>
             <h1 class="text-xl font-bold text-[#FFAA33]">MailBox</h1>
+            <div class={($connectionStatuses.singleSsh === 'failure' || $connectionStatuses.sftp === 'failure') ? 'border border-red-500 p-2' : ''}>
             <div class="space-y-1 py-4">
               <div class="space-y-1 py-4">
                 <h1 class="text-xl font-bold text-[#FFAA33]">SSH Connection</h1>
@@ -1507,28 +2451,31 @@ function handleSaveSSHConnection() {
               </div>
             </div>
 
-            <div class="space-y-1 py-4">
-              <h1 class="text-xl font-bold text-[#FFAA33]">SAB BPM</h1>
-              <p class="font-bold mt-2">These settings are only useful if SAB BPM is version 7.5.10 or higher.</p>
-              <div class="flex items-center">
-                <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
-                <input type="text" bind:value={$bpmConnection.username} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required>
-              </div>
-              <div class="flex items-center">
-                <label class="text-gray-700 dark:text-gray-300 w-1/4">Language:</label>
-                <select bind:value={$bpmConnection.language} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required>
-                  <option value="FR">FR</option>
-                  <option value="EN">EN</option>
-                </select>
-              </div>
-              <div class="flex items-center">
-                <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
-                <input type="password" bind:value={$bpmConnection.password} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required>
-              </div>
+        
+          </div>
+          <div class="space-y-1 py-4">
+            <h1 class="text-xl font-bold text-[#FFAA33]">SAB BPM</h1>
+            <p class="font-bold mt-2">These settings are only useful if SAB BPM is version 7.5.10 or higher.</p>
+            <div class="flex items-center">
+              <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
+              <input type="text" bind:value={$bpmConnection.username} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required>
             </div>
-
+            <div class="flex items-center">
+              <label class="text-gray-700 dark:text-gray-300 w-1/4">Language:</label>
+              <select bind:value={$bpmConnection.language} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required>
+                <option value="FR">FR</option>
+                <option value="EN">EN</option>
+              </select>
+            </div>
+            <div class="flex items-center">
+              <label class="text-gray-700 dark:text-gray-300 w-1/4">Password:</label>
+              <input type="password" bind:value={$bpmConnection.password} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required>
+            </div>
+          </div>
             <!-- Host Connection -->
             <div class="space-y-1 py-4">
+              <h1 class="text-xl font-bold text-[#FFAA33]">Host Database</h1>
+              <div class={$connectionStatuses.host === 'failure' ? 'border border-red-500 p-2' : ''}>
                 <button type="button"
                 on:click={() => testConnection($hostConnection, 0, "BDDHOST")} 
                 class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">
@@ -1632,10 +2579,13 @@ function handleSaveSSHConnection() {
                            bind:checked={$hostConnection.secured} 
                            class="align-middle transform scale-100">
                        </div>
+
+                       </div>
             </div>
 
             <!-- X3S CONNECTION -->
             <div class="space-y-1 py-4">
+              <div class={$connectionStatuses.x3s === 'failure' ? 'border border-red-500 p-2' : ''}>
                 <button type="button"
                 on:click={() => testConnection($x3sConnection, 0, "BDDX3S")} 
                 class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">
@@ -1742,10 +2692,13 @@ function handleSaveSSHConnection() {
                       class="align-middle transform scale-100">
                   </div>
                 </div>
+                </div>
             </div>
 
             <!-- TLM CONNECTION  -->
              <div class="space-y-1 py-4">
+              
+              <div class={$connectionStatuses.tlm === 'failure' ? 'border border-red-500 p-2' : ''}>
                 <button type="button"
                 on:click={() => testConnection($tlmConnection, 0, "BDDTLM")} 
                 class="bg-blue-500 dark:bg-blue-700 text-white px-2 py-0 focus:outline-none hover:bg-blue-600 dark:hover:bg-blue-800 text-sm rounded">
@@ -1852,6 +2805,9 @@ function handleSaveSSHConnection() {
           class="align-middle transform scale-100">
       </div>
                </div>
+
+              </div>
+
              </div>
              <button type="button" on:click={openAddWASConnectionModal} class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-700">Add</button>
 
@@ -1908,7 +2864,7 @@ function handleSaveSSHConnection() {
                         </div>
                         <div class="col-span-1">
                           <label class="text-gray-700 dark:text-gray-300">WAS SOAP Port :</label>
-                          <input type="number" bind:value={$newWasConnections.port} class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode} required/>
+                          <input type="number" min="0" bind:value={$newWasConnections.port} class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" disabled={viewingMode} required/>
                         </div>
                         <div class="col-span-1">
                           <label class="text-gray-700 dark:text-gray-300">WAS Password :</label>
@@ -1975,7 +2931,7 @@ function handleSaveSSHConnection() {
              <Popover.Root>
               {#if sshPopoverOpen}
               <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div class="relative p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 max-w-4xl w-full">
+                  <div class="relative p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-300 dark:border-gray-700 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
                       <button
                           class="absolute top-3 right-3 text-gray-800 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-400"
                           on:click={() => toggleSSHPopover(false)}
@@ -1988,9 +2944,9 @@ function handleSaveSSHConnection() {
                       <h1 class="text-xl font-bold text-[#FFAA33]">SSH Connection</h1>
           
                       {#if $errorMessage}
-                          <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                              <span class="block sm:inline">{$errorMessage}</span>
-                          </div>
+                      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                          <span class="block sm:inline">{$errorMessage}</span>
+                      </div>
                       {/if}
           
                       <div class="flex items-center mb-4">
@@ -2006,7 +2962,7 @@ function handleSaveSSHConnection() {
                       </div>
                       <div class="flex items-center mb-4">
                           <label class="text-gray-700 dark:text-gray-300 w-1/4">Port:</label>
-                          <input type="number" bind:value={$newSshConnections.port} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
+                          <input type="number" min="0" bind:value={$newSshConnections.port} class="border border-gray-300 dark:border-gray-700 rounded py-1 px-2 text-gray-700 dark:text-gray-300 w-2/5 bg-gray-100 dark:bg-gray-900" required disabled={viewingMode}/>
                       </div>
                       <div class="flex items-center mb-4">
                           <label class="text-gray-700 dark:text-gray-300 w-1/4">Login:</label>
@@ -2056,39 +3012,39 @@ function handleSaveSSHConnection() {
                               <div>
                                   <label class="text-gray-700 dark:text-gray-300">YPC:</label>
                                   <input type="checkbox" class="align-middle transform scale-100" 
-                                         checked={$newRemoteConnectionFeature.probe_application === 'YPC'}
-                                         on:change={() => handleApplicationChange('YPC')} disabled/>
+                                          checked={$newRemoteConnectionFeature.probe_application === 'YPC'}
+                                          on:change={() => handleApplicationChange('YPC')} disabled/>
                               </div>
                               {:else}
                               <div>
                                   <label class="text-gray-700 dark:text-gray-300">BPM:</label>
                                   <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
-                                         checked={$newRemoteConnectionFeature.probe_application === 'BPM'}
-                                         on:change={() => handleApplicationChange('BPM')}/>
+                                          checked={$newRemoteConnectionFeature.probe_application === 'BPM'}
+                                          on:change={() => handleApplicationChange('BPM')}/>
                               </div>
                               <div>
                                   <label class="text-gray-700 dark:text-gray-300">SDE:</label>
                                   <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
-                                         checked={$newRemoteConnectionFeature.probe_application === 'SDE'}
-                                         on:change={() => handleApplicationChange('SDE')}/>
+                                          checked={$newRemoteConnectionFeature.probe_application === 'SDE'}
+                                          on:change={() => handleApplicationChange('SDE')}/>
                               </div>
                               <div>
                                   <label class="text-gray-700 dark:text-gray-300">X3:</label>
                                   <input type="checkbox" class="align-middle transform scale-100" disabled={viewingMode}
-                                         checked={$newRemoteConnectionFeature.probe_application === 'X3'}
-                                         on:change={() => handleApplicationChange('X3')}/>
+                                          checked={$newRemoteConnectionFeature.probe_application === 'X3'}
+                                          on:change={() => handleApplicationChange('X3')}/>
                               </div>
                               <div>
                                   <label class="text-gray-700 dark:text-gray-300">X3S:</label>
                                   <input type="checkbox" class="align-middle transform scale-100"
-                                         checked={$newRemoteConnectionFeature.probe_application === 'X3S'} disabled={viewingMode}
-                                         on:change={() => handleApplicationChange('X3S')}/>
+                                          checked={$newRemoteConnectionFeature.probe_application === 'X3S'} disabled={viewingMode}
+                                          on:change={() => handleApplicationChange('X3S')}/>
                               </div>
                               <div>
                                   <label class="text-gray-700 dark:text-gray-300">YPB:</label>
                                   <input type="checkbox" class="align-middle transform scale-100"
-                                         checked={$newRemoteConnectionFeature.probe_application === 'YPB'} disabled={viewingMode}
-                                         on:change={() => handleApplicationChange('YPB')}/>
+                                          checked={$newRemoteConnectionFeature.probe_application === 'YPB'} disabled={viewingMode}
+                                          on:change={() => handleApplicationChange('YPB')}/>
                               </div>
                               {/if}
                           </div>
@@ -2165,11 +3121,16 @@ function handleSaveSSHConnection() {
                                   />
                               </div>
                               <div>
-                                  <label class="block text-gray-700 dark:text-gray-300">WebSphere Access Information:</label>
-                                  <input
-                                      bind:value={$newWasAppServerConfig.was_config_oid}
-                                      class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
-                                  />
+                                <label class="block text-gray-700 dark:text-gray-300">WebSphere Access Information:</label>
+                                <select
+                                  bind:value={$newWasAppServerConfig.was_con_oid}
+                                  class="bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-gray-700 dark:text-gray-300 w-full" required disabled={viewingMode}
+                                >
+                                  <option value="" disabled selected>Select WebSphere Connection</option>
+                                  {#each $wasConnections as wasConnection, index}
+                                    <option value={index}>{wasConnection.name || 'N/A'}</option>
+                                  {/each}
+                                </select>
                               </div>
                           </div>
                           <div>
@@ -2223,7 +3184,6 @@ function handleSaveSSHConnection() {
               </div>
               {/if}
           </Popover.Root>
-
              <!-- SSH Table -->
              <div class="overflow-x-auto mb-6">
                 <h4 class="font-bold underline text-[#FFAA33] mt-4">SSH Connections</h4>
